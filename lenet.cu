@@ -549,6 +549,7 @@ struct TrainingContext
     {        
         float alpha = 1.0f, beta = 0.0f;
         checkCudaErrors(cudaSetDevice(m_gpuid));
+	printf("m_gpuid %d\n",m_gpuid);
 
         // Conv1 layer
         checkCUDNN(cudnnConvolutionForward(cudnnHandle, &alpha, dataTensor,
