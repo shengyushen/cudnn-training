@@ -372,6 +372,7 @@ struct TrainingContext
         m_batchSize = batch_size;
 	printf("ref_pfc1->inputs %d\n",ref_pfc1->inputs);
 	printf("ref_pfc1->outputs %d\n",ref_pfc1->outputs);
+	printf("gpuid %d\n",gpuid);
 
         // Create CUBLAS and CUDNN handles
         checkCudaErrors(cudaSetDevice(gpuid));
@@ -545,7 +546,7 @@ struct TrainingContext
         return sizeInBytes;
     }
 
-    void ForwardPropagation(float *data, float *conv1, float *pool1, float *conv2, float *pool2, float *fc1, float *fc1relu,
+    void ForwardPropagation1(float *data, float *conv1, float *pool1, float *conv2, float *pool2, float *fc1, float *fc1relu,
                             float *fc2, float *result,
                             float *pconv1, float *pconv1bias, 
                             float *pconv2, float *pconv2bias, 
@@ -554,7 +555,7 @@ struct TrainingContext
     {        
         float alpha = 1.0f, beta = 0.0f;
         checkCudaErrors(cudaSetDevice(m_gpuid));
-	printf("m_gpuid %d\n",m_gpuid);
+	printf("%s m_gpuid= %d\n",__FUNCTION__,m_gpuid);
 
         // Conv1 layer
         checkCUDNN(cudnnConvolutionForward(cudnnHandle, &alpha, dataTensor,
@@ -568,6 +569,19 @@ struct TrainingContext
         checkCUDNN(cudnnPoolingForward(cudnnHandle, poolDesc, &alpha, conv1Tensor,
                                        conv1, &beta, pool1Tensor, pool1));
 
+    }
+
+    void ForwardPropagation2(float *data, float *conv1, float *pool1, float *conv2, float *pool2, float *fc1, float *fc1relu,
+                            float *fc2, float *result,
+                            float *pconv1, float *pconv1bias, 
+                            float *pconv2, float *pconv2bias, 
+                            float *pfc1, float *pfc1bias,
+                            float *pfc2, float *pfc2bias, void *workspace, float *onevec)
+    {        
+        float alpha = 1.0f, beta = 0.0f;
+        checkCudaErrors(cudaSetDevice(m_gpuid));
+	printf("%s m_gpuid= %d\n",__FUNCTION__,m_gpuid);
+
         // Conv2 layer
         checkCUDNN(cudnnConvolutionForward(cudnnHandle, &alpha, pool1Tensor,
                                            pool1, conv2filterDesc, pconv2, conv2Desc, 
@@ -579,11 +593,24 @@ struct TrainingContext
         // Pool2 layer
         checkCUDNN(cudnnPoolingForward(cudnnHandle, poolDesc, &alpha, conv2Tensor,
                                        conv2, &beta, pool2Tensor, pool2));
+    }
+
+    void ForwardPropagation3(float *data, float *conv1, float *pool1, float *conv2, float *pool2, float *fc1, float *fc1relu,
+                            float *fc2, float *result,
+                            float *pconv1, float *pconv1bias, 
+                            float *pconv2, float *pconv2bias, 
+                            float *pfc1, float *pfc1bias,
+                            float *pfc2, float *pfc2bias, void *workspace, float *onevec)
+    {        
+        float alpha = 1.0f, beta = 0.0f;
+        checkCudaErrors(cudaSetDevice(m_gpuid));
+	printf("%s m_gpuid= %d\n",__FUNCTION__,m_gpuid);
+
 
         // FC1 layer
         // Forward propagate neurons using weights (fc1 = pfc1'*pool2)
-	printf("ref_pfc1->outputs %d\n",ref_pfc1->outputs);
-	printf("ref_pfc1->inputs %d\n",ref_pfc1->inputs);
+//	printf("ref_pfc1->outputs %d\n",ref_pfc1->outputs);
+//	printf("ref_pfc1->inputs %d\n",ref_pfc1->inputs);
         checkCudaErrors(cublasSgemm(cublasHandle, CUBLAS_OP_T, CUBLAS_OP_N,
                                     ref_pfc1->outputs, m_batchSize, ref_pfc1->inputs,
                                     &alpha,
@@ -806,8 +833,10 @@ int main(int argc, char **argv)
 #ifdef USE_GFLAGS
     gflags::ParseCommandLineFlags(&argc, &argv, true);
 #endif
-	assert(argc==3);
+	assert(argc==5);
 	printf("argc %d\n",argc);
+	bool copy=(atoi(argv[3])>0);
+	float fract = (atof(argv[4]));
     size_t width, height, channels = 1;
 
     // Open input data
@@ -910,7 +939,7 @@ for(int gpuid=0;gpuid<num_gpus;gpuid++)     {
     MaxPoolLayer pool2(2, 2);
     FullyConnectedLayer* pfc1 = new FullyConnectedLayer((conv2.out_channels*conv2.out_width*conv2.out_height) / (pool2.stride * pool2.stride), 500);
     FullyConnectedLayer* pfc2 = new FullyConnectedLayer(pfc1->outputs, 10);
-    TrainingContext* pcontext=new TrainingContext(FLAGS_gpu, FLAGS_batch_size, conv1, pool1, conv2, pool2, pfc1, pfc2);
+    TrainingContext* pcontext=new TrainingContext(gpuid, FLAGS_batch_size, conv1, pool1, conv2, pool2, pfc1, pfc2);
 	conv1V.push_back(conv1);
 	pool1V.push_back(pool1);
 	conv2V.push_back(conv2);
@@ -1121,7 +1150,79 @@ float *	d_fc2smax;
         
         // Forward propagation
 	for(int gpuid=0;gpuid<num_gpus;gpuid++)     {
-        contextV[gpuid]->ForwardPropagation(
+        contextV[gpuid]->ForwardPropagation1(
+		d_dataV[gpuid], 
+		d_conv1V[gpuid], 
+		d_pool1V[gpuid], 
+		d_conv2V[gpuid], 
+		d_pool2V[gpuid], 
+		d_fc1V[gpuid], 
+		d_fc1reluV[gpuid], 
+		d_fc2V[gpuid], 
+		d_fc2smaxV[gpuid], 
+		d_pconv1V[gpuid], 
+		d_pconv1biasV[gpuid], 
+		d_pconv2V[gpuid], 
+		d_pconv2biasV[gpuid], 
+		d_pfc1V[gpuid], 
+		d_pfc1biasV[gpuid], 
+		d_pfc2V[gpuid], 
+		d_pfc2biasV[gpuid],
+		d_cudnn_workspaceV[gpuid], 
+		d_onevecV[gpuid]
+		);
+	}
+   if(copy) {
+	for(int gpuid=0;gpuid<num_gpus;gpuid++)     {
+		//sync n+1 to n
+		checkCudaErrors(cudaSetDevice(gpuid));
+		size_t sz=sizeof(float) * contextV[gpuid]->m_batchSize * conv1V[gpuid].out_channels * (conv1V[gpuid].out_height / pool1V[gpuid].stride) * (conv1V[gpuid].out_width / pool1V[gpuid].stride);
+		printf("coping sz %d\n",sz);
+		if(gpuid<num_gpus-1)
+	            checkCudaErrors(cudaMemcpyAsync(d_pool1V[gpuid], d_pool1V[gpuid+1], int(fract*sz/2), cudaMemcpyDefault));
+		if(gpuid>0)
+	            checkCudaErrors(cudaMemcpyAsync(d_pool1V[gpuid]+sz/2, d_pool1V[gpuid-1], int(fract*sz/2), cudaMemcpyDefault));
+	}
+	checkCudaErrors(cudaDeviceSynchronize());
+   }
+	for(int gpuid=0;gpuid<num_gpus;gpuid++)     {
+        contextV[gpuid]->ForwardPropagation2(
+		d_dataV[gpuid], 
+		d_conv1V[gpuid], 
+		d_pool1V[gpuid], 
+		d_conv2V[gpuid], 
+		d_pool2V[gpuid], 
+		d_fc1V[gpuid], 
+		d_fc1reluV[gpuid], 
+		d_fc2V[gpuid], 
+		d_fc2smaxV[gpuid], 
+		d_pconv1V[gpuid], 
+		d_pconv1biasV[gpuid], 
+		d_pconv2V[gpuid], 
+		d_pconv2biasV[gpuid], 
+		d_pfc1V[gpuid], 
+		d_pfc1biasV[gpuid], 
+		d_pfc2V[gpuid], 
+		d_pfc2biasV[gpuid],
+		d_cudnn_workspaceV[gpuid], 
+		d_onevecV[gpuid]
+		);
+	}
+   if(copy) {
+	for(int gpuid=0;gpuid<num_gpus;gpuid++)     {
+		//sync n+1 to n
+		checkCudaErrors(cudaSetDevice(gpuid));
+		size_t sz=sizeof(float) * contextV[gpuid]->m_batchSize * conv1V[gpuid].out_channels * (conv1V[gpuid].out_height / pool2V[gpuid].stride) * (conv1V[gpuid].out_width / pool2V[gpuid].stride);
+		printf("coping sz %d\n",sz);
+		if(gpuid<num_gpus-1)
+	            checkCudaErrors(cudaMemcpyAsync(d_pool2V[gpuid], d_pool2V[gpuid+1],int(fract*sz/2), cudaMemcpyDefault));
+		if(gpuid>0)
+	            checkCudaErrors(cudaMemcpyAsync(d_pool2V[gpuid]+sz/2, d_pool2V[gpuid-1], int(fract*sz/2), cudaMemcpyDefault));
+	}
+	checkCudaErrors(cudaDeviceSynchronize());
+   }
+	for(int gpuid=0;gpuid<num_gpus;gpuid++)     {
+        contextV[gpuid]->ForwardPropagation3(
 		d_dataV[gpuid], 
 		d_conv1V[gpuid], 
 		d_pool1V[gpuid], 
@@ -1162,7 +1263,7 @@ float *	d_fc2smax;
     checkCudaErrors(cudaDeviceSynchronize());
     auto t2 = std::chrono::high_resolution_clock::now();
 
-    printf("Iteration time: %f ms\n", std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count() / 1000.0f / iterations);
+    printf("Iteration time: width %d fract %f time %f ms\n",width,copy?fract:0.0, std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count() / 1000.0f / iterations);
 //ssy all save and test    
 //    if (FLAGS_save_data)
 //    {
