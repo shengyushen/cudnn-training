@@ -23,6 +23,8 @@ To compile with CMake, run the following commands:
 ~/cudnn-training: $ mkdir build
 ~/cudnn-training: $ cd build/
 ~/cudnn-training/build: $ cmake ..
+or you can generate debug version with
+cmake -DCMAKE_BUILD_TYPE=Debug ..
 export CUDNN_PATH=/usr/local/cuda-9.0/lib64
 ~/cudnn-training/build: $ make
 ```
