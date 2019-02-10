@@ -479,7 +479,7 @@ struct TrainingContext
         int c = conv.in_channels;
         int h = conv.in_height;
         int w = conv.in_width;
-
+//ssy: the size of each tensor is set here
         checkCUDNN(cudnnSetTensor4dDescriptor(srcTensorDesc,
                                               CUDNN_TENSOR_NCHW,
                                               CUDNN_DATA_FLOAT,
