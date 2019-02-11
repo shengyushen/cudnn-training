@@ -906,8 +906,10 @@ std::vector<float*> d_dataV;
 std::vector<float*> d_labelsV; 
 std::vector<float*> d_conv1V; 
 std::vector<float*> d_pool1V; 
+std::vector<float*> d_pool1V_xxx; 
 std::vector<float*> d_conv2V; 
 std::vector<float*> d_pool2V; 
+std::vector<float*> d_pool2V_xxx; 
 std::vector<float*> d_fc1V; 
 std::vector<float*> d_fc1reluV; 
 std::vector<float*> d_fc2V; 
@@ -1000,8 +1002,10 @@ float *	d_data;
 float *	d_labels; 
 float *	d_conv1; 
 float *	d_pool1; 
+float *	d_pool1_xxx; 
 float *	d_conv2; 
 float *	d_pool2; 
+float *	d_pool2_xxx; 
 float *	d_fc1; 
 float *	d_fc1relu; 
 float *	d_fc2; 
@@ -1012,8 +1016,10 @@ float *	d_fc2smax;
     checkCudaErrors(cudaMallocManaged(&d_labels,  sizeof(float) * pcontext->m_batchSize * 1                  * 1                                 * 1));
     checkCudaErrors(cudaMallocManaged(&d_conv1,   sizeof(float) * pcontext->m_batchSize * conv1.out_channels * conv1.out_height                  * conv1.out_width));
     checkCudaErrors(cudaMallocManaged(&d_pool1,   sizeof(float) * pcontext->m_batchSize * conv1.out_channels * (conv1.out_height / pool1.stride) * (conv1.out_width / pool1.stride)));
+    checkCudaErrors(cudaMallocManaged(&d_pool1_xxx,   sizeof(float) * pcontext->m_batchSize * conv1.out_channels * (conv1.out_height / pool1.stride) * (conv1.out_width / pool1.stride)));
     checkCudaErrors(cudaMallocManaged(&d_conv2,   sizeof(float) * pcontext->m_batchSize * conv2.out_channels * conv2.out_height                  * conv2.out_width));
     checkCudaErrors(cudaMallocManaged(&d_pool2,   sizeof(float) * pcontext->m_batchSize * conv2.out_channels * (conv2.out_height / pool2.stride) * (conv2.out_width / pool2.stride)));
+    checkCudaErrors(cudaMallocManaged(&d_pool2_xxx,   sizeof(float) * pcontext->m_batchSize * conv2.out_channels * (conv2.out_height / pool2.stride) * (conv2.out_width / pool2.stride)));
     checkCudaErrors(cudaMallocManaged(&d_fc1,     sizeof(float) * pcontext->m_batchSize * pfc1->outputs));    
     checkCudaErrors(cudaMallocManaged(&d_fc1relu, sizeof(float) * pcontext->m_batchSize * pfc1->outputs));
     checkCudaErrors(cudaMallocManaged(&d_fc2,     sizeof(float) * pcontext->m_batchSize * pfc2->outputs));
@@ -1049,8 +1055,10 @@ float *	d_fc2smax;
  d_labelsV     .push_back(d_labels);
  d_conv1V      .push_back(d_conv1);
  d_pool1V      .push_back(d_pool1);
+ d_pool1V_xxx      .push_back(d_pool1_xxx);
  d_conv2V      .push_back(d_conv2);
  d_pool2V      .push_back(d_pool2);
+ d_pool2V_xxx      .push_back(d_pool2_xxx);
  d_fc1V        .push_back(d_fc1);
  d_fc1reluV    .push_back(d_fc1relu);
  d_fc2V        .push_back(d_fc2);
@@ -1178,10 +1186,10 @@ float *	d_fc2smax;
 		checkCudaErrors(cudaSetDevice(gpuid));
 		size_t sz=sizeof(float) * contextV[gpuid]->m_batchSize * conv1V[gpuid].out_channels * (conv1V[gpuid].out_height / pool1V[gpuid].stride) * (conv1V[gpuid].out_width / pool1V[gpuid].stride);
 		printf("coping sz %d\n",sz);
-		if(gpuid<num_gpus-1)
-	            checkCudaErrors(cudaMemcpyAsync(d_pool1V[gpuid], d_pool1V[gpuid+1], int(fract*sz/2), cudaMemcpyDefault));
+//		if(gpuid<num_gpus-1)
+//	            checkCudaErrors(cudaMemcpyAsync(d_pool1V[gpuid], d_pool1V[gpuid+1], int(fract*sz/2), cudaMemcpyDefault));
 		if(gpuid>0)
-	            checkCudaErrors(cudaMemcpyAsync(d_pool1V[gpuid]+sz/2, d_pool1V[gpuid-1], int(fract*sz/2), cudaMemcpyDefault));
+	            checkCudaErrors(cudaMemcpyAsync(d_pool1V[gpuid]+sz/(2*sizeof(float)), d_pool1V[gpuid-1], int(fract*sz/2), cudaMemcpyDefault));
 	}
 	checkCudaErrors(cudaDeviceSynchronize());
    }
@@ -1212,12 +1220,12 @@ float *	d_fc2smax;
 	for(int gpuid=0;gpuid<num_gpus;gpuid++)     {
 		//sync n+1 to n
 		checkCudaErrors(cudaSetDevice(gpuid));
-		size_t sz=sizeof(float) * contextV[gpuid]->m_batchSize * conv1V[gpuid].out_channels * (conv1V[gpuid].out_height / pool2V[gpuid].stride) * (conv1V[gpuid].out_width / pool2V[gpuid].stride);
+		size_t sz=sizeof(float) * contextV[gpuid]->m_batchSize * conv2V[gpuid].out_channels * (conv2V[gpuid].out_height / pool2V[gpuid].stride) * (conv2V[gpuid].out_width / pool2V[gpuid].stride);
 		printf("coping sz %d\n",sz);
-		if(gpuid<num_gpus-1)
-	            checkCudaErrors(cudaMemcpyAsync(d_pool2V[gpuid], d_pool2V[gpuid+1],int(fract*sz/2), cudaMemcpyDefault));
+//		if(gpuid<num_gpus-1)
+//	            checkCudaErrors(cudaMemcpyAsync(d_pool2V[gpuid], d_pool2V[gpuid+1],int(fract*sz/2), cudaMemcpyDefault));
 		if(gpuid>0)
-	            checkCudaErrors(cudaMemcpyAsync(d_pool2V[gpuid]+sz/2, d_pool2V[gpuid-1], int(fract*sz/2), cudaMemcpyDefault));
+	            checkCudaErrors(cudaMemcpyAsync(d_pool2V[gpuid]+sz/(2*sizeof(float)), d_pool2V[gpuid-1], int(fract*sz/2), cudaMemcpyDefault));
 	}
 	checkCudaErrors(cudaDeviceSynchronize());
    }
