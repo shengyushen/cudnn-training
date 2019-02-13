@@ -1304,65 +1304,65 @@ main (int argc, char **argv)
       checkCudaErrors (cudaMemAdvise (d_gfc2,sizeof(float)* pfc2->pneurons.size (),cudaMemAdviseSetPreferredLocation,gpuid));
       checkCudaErrors (cudaMemAdvise (d_gfc2bias,sizeof(float)* pfc2->pbias.size (),cudaMemAdviseSetPreferredLocation,gpuid));
 
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_data,
-				    pcontext->m_batchSize * channels *
-				    height * width);
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_labels,
-				    pcontext->m_batchSize * 1 * 1 * 1);
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_conv1,
-				    pcontext->m_batchSize *
-				    conv1.out_channels * conv1.out_height *
-				    conv1.out_width);
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pool1,
-				    pcontext->m_batchSize *
-				    conv1.out_channels * (conv1.out_height /
-							  pool1.stride) *
-				    (conv1.out_width / pool1.stride));
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pool1_xxx,
-				    pcontext->m_batchSize *
-				    conv1.out_channels * (conv1.out_height /
-							  pool1.stride) *
-				    (conv1.out_width / pool1.stride));
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_conv2,
-				    pcontext->m_batchSize *
-				    conv2.out_channels * conv2.out_height *
-				    conv2.out_width);
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pool2,
-				    pcontext->m_batchSize *
-				    conv2.out_channels * (conv2.out_height /
-							  pool2.stride) *
-				    (conv2.out_width / pool2.stride));
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pool2_xxx,
-				    pcontext->m_batchSize *
-				    conv2.out_channels * (conv2.out_height /
-							  pool2.stride) *
-				    (conv2.out_width / pool2.stride));
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_fc1,
-				    pcontext->m_batchSize * pfc1->outputs);
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_fc1relu,
-				    pcontext->m_batchSize * pfc1->outputs);
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_fc2,
-				    pcontext->m_batchSize * pfc2->outputs);
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_fc2smax,
-				    pcontext->m_batchSize * pfc2->outputs);
-
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pconv1, conv1.pconv.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pconv1bias, conv1.pbias.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pconv2, conv2.pconv.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pconv2bias, conv2.pbias.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pfc1, pfc1->pneurons.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pfc1bias, pfc1->pbias.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pfc2, pfc2->pneurons.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pfc2bias, pfc2->pbias.size ());
-
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_gconv1, conv1.pconv.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_gconv1bias, conv1.pbias.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_gconv2, conv2.pconv.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_gconv2bias, conv2.pbias.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_gfc1, pfc1->pneurons.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_gfc1bias, pfc1->pbias.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_gfc2, pfc2->pneurons.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_gfc2bias, pfc2->pbias.size ());
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_data,
+//				    pcontext->m_batchSize * channels *
+//				    height * width);
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_labels,
+//				    pcontext->m_batchSize * 1 * 1 * 1);
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_conv1,
+//				    pcontext->m_batchSize *
+//				    conv1.out_channels * conv1.out_height *
+//				    conv1.out_width);
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pool1,
+//				    pcontext->m_batchSize *
+//				    conv1.out_channels * (conv1.out_height /
+//							  pool1.stride) *
+//				    (conv1.out_width / pool1.stride));
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pool1_xxx,
+//				    pcontext->m_batchSize *
+//				    conv1.out_channels * (conv1.out_height /
+//							  pool1.stride) *
+//				    (conv1.out_width / pool1.stride));
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_conv2,
+//				    pcontext->m_batchSize *
+//				    conv2.out_channels * conv2.out_height *
+//				    conv2.out_width);
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pool2,
+//				    pcontext->m_batchSize *
+//				    conv2.out_channels * (conv2.out_height /
+//							  pool2.stride) *
+//				    (conv2.out_width / pool2.stride));
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pool2_xxx,
+//				    pcontext->m_batchSize *
+//				    conv2.out_channels * (conv2.out_height /
+//							  pool2.stride) *
+//				    (conv2.out_width / pool2.stride));
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_fc1,
+//				    pcontext->m_batchSize * pfc1->outputs);
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_fc1relu,
+//				    pcontext->m_batchSize * pfc1->outputs);
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_fc2,
+//				    pcontext->m_batchSize * pfc2->outputs);
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_fc2smax,
+//				    pcontext->m_batchSize * pfc2->outputs);
+//
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pconv1, conv1.pconv.size ());
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pconv1bias, conv1.pbias.size ());
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pconv2, conv2.pconv.size ());
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pconv2bias, conv2.pbias.size ());
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pfc1, pfc1->pneurons.size ());
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pfc1bias, pfc1->pbias.size ());
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pfc2, pfc2->pneurons.size ());
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pfc2bias, pfc2->pbias.size ());
+//
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_gconv1, conv1.pconv.size ());
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_gconv1bias, conv1.pbias.size ());
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_gconv2, conv2.pconv.size ());
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_gconv2bias, conv2.pbias.size ());
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_gfc1, pfc1->pneurons.size ());
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_gfc1bias, pfc1->pbias.size ());
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_gfc2, pfc2->pneurons.size ());
+//      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_gfc2bias, pfc2->pbias.size ());
 
       d_dataV.push_back (d_data);
       d_labelsV.push_back (d_labels);
