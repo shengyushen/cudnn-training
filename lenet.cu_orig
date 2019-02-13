@@ -765,8 +765,7 @@ struct TrainingContext
 
     // Softmax layer
     SoftmaxLossBackprop <<< RoundUp (m_batchSize, BW), BW >>> (labels,
-							       ref_pfc2->
-							       outputs,
+							       ref_pfc2->outputs,
 							       m_batchSize,
 							       dloss_data);
 
@@ -995,17 +994,6 @@ main (int argc, char **argv)
       return 4;
     }
   printf ("using %d GPUs \n", num_gpus);
-
-
-	int deviceId;
-  int numberOfSMs;
-	checkCudaErrors(cudaSetDevice(0));
-	cudaGetDevice(&deviceId);
-	printf ("deviceId %d\n", deviceId);
-//	cudaDeviceGetAttribute(&numberOfSMs, cudaDevAttrMultiProcessorCount, deviceId);
-	//printf("numberOfSMs %s\n",numberOfSMs);
-  int threadsPerBlock = 256;
-  int numberOfBlocks = 32*80 ;
 
   // Create the LeNet network architecture
   std::vector < ConvBiasLayer > conv1V;
@@ -1244,125 +1232,65 @@ main (int argc, char **argv)
       checkCudaErrors (cudaMallocManaged
 		       (&d_gfc2bias, sizeof (float) * pfc2->pbias.size ()));
 
-      checkCudaErrors (cudaMemAdvise (d_data,sizeof(float)*
-				    pcontext->m_batchSize * channels *
-				    height * width,cudaMemAdviseSetPreferredLocation,gpuid));
-      checkCudaErrors (cudaMemAdvise (d_labels,sizeof(float)*
-				    pcontext->m_batchSize * 1 * 1 * 1,cudaMemAdviseSetPreferredLocation,gpuid));
-      checkCudaErrors (cudaMemAdvise (d_conv1,sizeof(float)*
-				    pcontext->m_batchSize *
-				    conv1.out_channels * conv1.out_height *
-				    conv1.out_width,cudaMemAdviseSetPreferredLocation,gpuid));
-      checkCudaErrors (cudaMemAdvise (d_pool1,sizeof(float)*
-				    pcontext->m_batchSize *
-				    conv1.out_channels * (conv1.out_height /
-							  pool1.stride) *
-				    (conv1.out_width / pool1.stride),cudaMemAdviseSetPreferredLocation,gpuid));
-      checkCudaErrors (cudaMemAdvise (d_pool1_xxx,sizeof(float)*
-				    pcontext->m_batchSize *
-				    conv1.out_channels * (conv1.out_height /
-							  pool1.stride) *
-				    (conv1.out_width / pool1.stride),cudaMemAdviseSetPreferredLocation,gpuid));
-      checkCudaErrors (cudaMemAdvise (d_conv2,sizeof(float)*
-				    pcontext->m_batchSize *
-				    conv2.out_channels * conv2.out_height *
-				    conv2.out_width,cudaMemAdviseSetPreferredLocation,gpuid));
-      checkCudaErrors (cudaMemAdvise (d_pool2,sizeof(float)*
-				    pcontext->m_batchSize *
-				    conv2.out_channels * (conv2.out_height /
-							  pool2.stride) *
-				    (conv2.out_width / pool2.stride),cudaMemAdviseSetPreferredLocation,gpuid));
-      checkCudaErrors (cudaMemAdvise (d_pool2_xxx,sizeof(float)*
-				    pcontext->m_batchSize *
-				    conv2.out_channels * (conv2.out_height /
-							  pool2.stride) *
-				    (conv2.out_width / pool2.stride),cudaMemAdviseSetPreferredLocation,gpuid));
-      checkCudaErrors (cudaMemAdvise (d_fc1,sizeof(float)*
-				    pcontext->m_batchSize * pfc1->outputs,cudaMemAdviseSetPreferredLocation,gpuid));
-      checkCudaErrors (cudaMemAdvise (d_fc1relu,sizeof(float)*
-				    pcontext->m_batchSize * pfc1->outputs,cudaMemAdviseSetPreferredLocation,gpuid));
-      checkCudaErrors (cudaMemAdvise (d_fc2,sizeof(float)*
-				    pcontext->m_batchSize * pfc2->outputs,cudaMemAdviseSetPreferredLocation,gpuid));
-      checkCudaErrors (cudaMemAdvise (d_fc2smax,sizeof(float)*
-				    pcontext->m_batchSize * pfc2->outputs,cudaMemAdviseSetPreferredLocation,gpuid));
-
-      checkCudaErrors (cudaMemAdvise (d_pconv1,sizeof(float)* conv1.pconv.size (),cudaMemAdviseSetPreferredLocation,gpuid));
-      checkCudaErrors (cudaMemAdvise (d_pconv1bias,sizeof(float)* conv1.pbias.size (),cudaMemAdviseSetPreferredLocation,gpuid));
-      checkCudaErrors (cudaMemAdvise (d_pconv2,sizeof(float)* conv2.pconv.size (),cudaMemAdviseSetPreferredLocation,gpuid));
-      checkCudaErrors (cudaMemAdvise (d_pconv2bias,sizeof(float)* conv2.pbias.size (),cudaMemAdviseSetPreferredLocation,gpuid));
-      checkCudaErrors (cudaMemAdvise (d_pfc1,sizeof(float)* pfc1->pneurons.size (),cudaMemAdviseSetPreferredLocation,gpuid));
-      checkCudaErrors (cudaMemAdvise (d_pfc1bias,sizeof(float)* pfc1->pbias.size (),cudaMemAdviseSetPreferredLocation,gpuid));
-      checkCudaErrors (cudaMemAdvise (d_pfc2,sizeof(float)* pfc2->pneurons.size (),cudaMemAdviseSetPreferredLocation,gpuid));
-      checkCudaErrors (cudaMemAdvise (d_pfc2bias,sizeof(float)* pfc2->pbias.size (),cudaMemAdviseSetPreferredLocation,gpuid));
-
-      checkCudaErrors (cudaMemAdvise (d_gconv1,sizeof(float)* conv1.pconv.size (),cudaMemAdviseSetPreferredLocation,gpuid));
-      checkCudaErrors (cudaMemAdvise (d_gconv1bias,sizeof(float)* conv1.pbias.size (),cudaMemAdviseSetPreferredLocation,gpuid));
-      checkCudaErrors (cudaMemAdvise (d_gconv2,sizeof(float)* conv2.pconv.size (),cudaMemAdviseSetPreferredLocation,gpuid));
-      checkCudaErrors (cudaMemAdvise (d_gconv2bias,sizeof(float)* conv2.pbias.size (),cudaMemAdviseSetPreferredLocation,gpuid));
-      checkCudaErrors (cudaMemAdvise (d_gfc1,sizeof(float)* pfc1->pneurons.size (),cudaMemAdviseSetPreferredLocation,gpuid));
-      checkCudaErrors (cudaMemAdvise (d_gfc1bias,sizeof(float)* pfc1->pbias.size (),cudaMemAdviseSetPreferredLocation,gpuid));
-      checkCudaErrors (cudaMemAdvise (d_gfc2,sizeof(float)* pfc2->pneurons.size (),cudaMemAdviseSetPreferredLocation,gpuid));
-      checkCudaErrors (cudaMemAdvise (d_gfc2bias,sizeof(float)* pfc2->pbias.size (),cudaMemAdviseSetPreferredLocation,gpuid));
-
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_data,
+      ssyinitfloat <<< 32, 256 >>> (d_data,
 				    pcontext->m_batchSize * channels *
 				    height * width);
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_labels,
+      ssyinitfloat <<< 32, 256 >>> (d_labels,
 				    pcontext->m_batchSize * 1 * 1 * 1);
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_conv1,
+      ssyinitfloat <<< 32, 256 >>> (d_conv1,
 				    pcontext->m_batchSize *
 				    conv1.out_channels * conv1.out_height *
 				    conv1.out_width);
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pool1,
+      ssyinitfloat <<< 32, 256 >>> (d_pool1,
 				    pcontext->m_batchSize *
 				    conv1.out_channels * (conv1.out_height /
 							  pool1.stride) *
 				    (conv1.out_width / pool1.stride));
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pool1_xxx,
+      ssyinitfloat <<< 32, 256 >>> (d_pool1_xxx,
 				    pcontext->m_batchSize *
 				    conv1.out_channels * (conv1.out_height /
 							  pool1.stride) *
 				    (conv1.out_width / pool1.stride));
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_conv2,
+      ssyinitfloat <<< 32, 256 >>> (d_conv2,
 				    pcontext->m_batchSize *
 				    conv2.out_channels * conv2.out_height *
 				    conv2.out_width);
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pool2,
+      ssyinitfloat <<< 32, 256 >>> (d_pool2,
 				    pcontext->m_batchSize *
 				    conv2.out_channels * (conv2.out_height /
 							  pool2.stride) *
 				    (conv2.out_width / pool2.stride));
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pool2_xxx,
+      ssyinitfloat <<< 32, 256 >>> (d_pool2_xxx,
 				    pcontext->m_batchSize *
 				    conv2.out_channels * (conv2.out_height /
 							  pool2.stride) *
 				    (conv2.out_width / pool2.stride));
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_fc1,
+      ssyinitfloat <<< 32, 256 >>> (d_fc1,
 				    pcontext->m_batchSize * pfc1->outputs);
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_fc1relu,
+      ssyinitfloat <<< 32, 256 >>> (d_fc1relu,
 				    pcontext->m_batchSize * pfc1->outputs);
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_fc2,
+      ssyinitfloat <<< 32, 256 >>> (d_fc2,
 				    pcontext->m_batchSize * pfc2->outputs);
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_fc2smax,
+      ssyinitfloat <<< 32, 256 >>> (d_fc2smax,
 				    pcontext->m_batchSize * pfc2->outputs);
 
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pconv1, conv1.pconv.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pconv1bias, conv1.pbias.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pconv2, conv2.pconv.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pconv2bias, conv2.pbias.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pfc1, pfc1->pneurons.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pfc1bias, pfc1->pbias.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pfc2, pfc2->pneurons.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_pfc2bias, pfc2->pbias.size ());
+      ssyinitfloat <<< 32, 256 >>> (d_pconv1, conv1.pconv.size ());
+      ssyinitfloat <<< 32, 256 >>> (d_pconv1bias, conv1.pbias.size ());
+      ssyinitfloat <<< 32, 256 >>> (d_pconv2, conv2.pconv.size ());
+      ssyinitfloat <<< 32, 256 >>> (d_pconv2bias, conv2.pbias.size ());
+      ssyinitfloat <<< 32, 256 >>> (d_pfc1, pfc1->pneurons.size ());
+      ssyinitfloat <<< 32, 256 >>> (d_pfc1bias, pfc1->pbias.size ());
+      ssyinitfloat <<< 32, 256 >>> (d_pfc2, pfc2->pneurons.size ());
+      ssyinitfloat <<< 32, 256 >>> (d_pfc2bias, pfc2->pbias.size ());
 
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_gconv1, conv1.pconv.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_gconv1bias, conv1.pbias.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_gconv2, conv2.pconv.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_gconv2bias, conv2.pbias.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_gfc1, pfc1->pneurons.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_gfc1bias, pfc1->pbias.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_gfc2, pfc2->pneurons.size ());
-      ssyinitfloat <<< numberOfBlocks, threadsPerBlock >>> (d_gfc2bias, pfc2->pbias.size ());
+      ssyinitfloat <<< 32, 256 >>> (d_gconv1, conv1.pconv.size ());
+      ssyinitfloat <<< 32, 256 >>> (d_gconv1bias, conv1.pbias.size ());
+      ssyinitfloat <<< 32, 256 >>> (d_gconv2, conv2.pconv.size ());
+      ssyinitfloat <<< 32, 256 >>> (d_gconv2bias, conv2.pbias.size ());
+      ssyinitfloat <<< 32, 256 >>> (d_gfc1, pfc1->pneurons.size ());
+      ssyinitfloat <<< 32, 256 >>> (d_gfc1bias, pfc1->pbias.size ());
+      ssyinitfloat <<< 32, 256 >>> (d_gfc2, pfc2->pneurons.size ());
+      ssyinitfloat <<< 32, 256 >>> (d_gfc2bias, pfc2->pbias.size ());
 
       d_dataV.push_back (d_data);
       d_labelsV.push_back (d_labels);
@@ -1432,8 +1360,7 @@ main (int argc, char **argv)
 
       // Fill one-vector with ones
       FillOnes <<< RoundUp (pcontext->m_batchSize, BW), BW >>> (d_onevec,
-								pcontext->
-								m_batchSize);
+								pcontext->m_batchSize);
 
     }
   printf ("Preparing dataset\n");
@@ -1474,10 +1401,6 @@ main (int argc, char **argv)
 
   // Use SGD to train the network
   checkCudaErrors (cudaDeviceSynchronize ());
-
-
-
-
   auto t1 = std::chrono::high_resolution_clock::now ();
   for (int iter = 0; iter < iterations; ++iter)
     {
@@ -1497,10 +1420,8 @@ main (int argc, char **argv)
 
 
 
-  for (int gpuid = 0; gpuid < num_gpus; gpuid++)
+      for (int gpuid = 0; gpuid < num_gpus; gpuid++)
 	{
-					assert(contextV[gpuid]->m_gpuid == gpuid);
-	  checkCudaErrors (cudaSetDevice (gpuid));
 	  contextV[gpuid]->ForwardPropagation1 (d_dataV[gpuid],
 						d_conv1V[gpuid],
 						d_pool1V[gpuid],
@@ -1525,21 +1446,32 @@ main (int argc, char **argv)
 
 
 
-  if (copy)
+      if (copy)
 	{
 	  for (int gpuid = 0; gpuid < num_gpus; gpuid++)
-	  {
+	    {
 	      //sync n+1 to n
 	      checkCudaErrors (cudaSetDevice (gpuid));
-	      size_t sz = sizeof (float) * contextV[gpuid]->m_batchSize * conv1V[gpuid].out_channels * (conv1V[gpuid].out_height / pool1V[gpuid].stride) * (conv1V[gpuid].out_width / pool1V[gpuid].stride);
+	      size_t sz =
+		sizeof (float) * contextV[gpuid]->m_batchSize *
+		conv1V[gpuid].out_channels * (conv1V[gpuid].out_height /
+					      pool1V[gpuid].stride) *
+		(conv1V[gpuid].out_width / pool1V[gpuid].stride);
 	      printf ("coping sz %d\n", sz);
 //              if(gpuid<num_gpus-1)
 //                  checkCudaErrors(cudaMemcpyAsync(d_pool1V[gpuid], d_pool1V[gpuid+1], int(fract*sz/2), cudaMemcpyDefault));
-	      if (gpuid > 0) {
-				  checkCudaErrors (cudaMemcpyAsync (d_pool1V[gpuid] + sz / (2 * sizeof (float)), d_pool1V[gpuid - 1], int (fract * sz / 2), cudaMemcpyDefault));
-				}
-	  }
-
+	      if (gpuid > 0)
+		{
+		  checkCudaErrors (cudaMemcpyAsync
+				   (d_pool1V[gpuid] +
+				    sz / (2 * sizeof (float)),
+				    d_pool1V[gpuid - 1], int (fract * sz / 2),
+				    cudaMemcpyDefault));
+		  checkCudaErrors (cudaMemPrefetchAsync
+				   (d_pool1V[gpuid], sz, gpuid));
+		  printf ("d_pool1V[gpuid] %x\n", d_pool1V[gpuid]);
+		}
+	    }
 	  for (int gpuid = 0; gpuid < num_gpus; gpuid++)
 	    {
 	      checkCudaErrors (cudaSetDevice (gpuid));
@@ -1550,9 +1482,11 @@ main (int argc, char **argv)
 
 
 
-  for (int gpuid = 0; gpuid < num_gpus; gpuid++)
+      for (int gpuid = 0; gpuid < num_gpus; gpuid++)
 	{
 	  checkCudaErrors (cudaSetDevice (gpuid));
+//              size_t sz=sizeof(float) * contextV[gpuid]->m_batchSize * conv1V[gpuid].out_channels * (conv1V[gpuid].out_height / pool1V[gpuid].stride) * (conv1V[gpuid].out_width / pool1V[gpuid].stride);
+//                                      checkCudaErrors(cudaMemPrefetchAsync(d_pool1V[gpuid],sz,gpuid));
 	  contextV[gpuid]->ForwardPropagation2 (d_dataV[gpuid],
 						d_conv1V[gpuid],
 						d_pool1V[gpuid],
@@ -1574,21 +1508,35 @@ main (int argc, char **argv)
 						d_onevecV[gpuid]);
 	}
 
-  if (copy)
+
+
+
+      if (copy)
 	{
 	  for (int gpuid = 0; gpuid < num_gpus; gpuid++)
-	  {
+	    {
 	      //sync n+1 to n
 	      checkCudaErrors (cudaSetDevice (gpuid));
-	      size_t sz = sizeof (float) * contextV[gpuid]->m_batchSize * conv2V[gpuid].out_channels * (conv2V[gpuid].out_height / pool2V[gpuid].stride) * (conv2V[gpuid].out_width / pool2V[gpuid].stride);
+	      size_t sz =
+		sizeof (float) * contextV[gpuid]->m_batchSize *
+		conv2V[gpuid].out_channels * (conv2V[gpuid].out_height /
+					      pool2V[gpuid].stride) *
+		(conv2V[gpuid].out_width / pool2V[gpuid].stride);
 	      printf ("coping sz %d\n", sz);
 //              if(gpuid<num_gpus-1)
-//                  checkCudaErrors(cudaMemcpyAsync(d_pool2V[gpuid], d_pool2V[gpuid+1], int(fract*sz/2), cudaMemcpyDefault));
-	      if (gpuid > 0) {
-				  checkCudaErrors (cudaMemcpyAsync (d_pool2V[gpuid] + sz / (2 * sizeof (float)), d_pool2V[gpuid - 1], int (fract * sz / 2), cudaMemcpyDefault));
-				}
-	  }
-
+//                  checkCudaErrors(cudaMemcpyAsync(d_pool2V[gpuid], d_pool2V[gpuid+1],int(fract*sz/2), cudaMemcpyDefault));
+	      if (gpuid > 0)
+		{
+		  checkCudaErrors (cudaMemcpyAsync
+				   (d_pool2V[gpuid] +
+				    sz / (2 * sizeof (float)),
+				    d_pool2V[gpuid - 1], int (fract * sz / 2),
+				    cudaMemcpyDefault));
+		  checkCudaErrors (cudaMemPrefetchAsync
+				   (d_pool2V[gpuid], sz, gpuid));
+		  printf ("d_pool2V[gpuid] %x\n", d_pool2V[gpuid]);
+		}
+	    }
 	  for (int gpuid = 0; gpuid < num_gpus; gpuid++)
 	    {
 	      checkCudaErrors (cudaSetDevice (gpuid));
@@ -1596,32 +1544,37 @@ main (int argc, char **argv)
 	    }
 	}
 
-	for(int gpuid=0;gpuid<num_gpus;gpuid++)     {
+
+
+
+
+
+      for (int gpuid = 0; gpuid < num_gpus; gpuid++)
+	{
 	  checkCudaErrors (cudaSetDevice (gpuid));
-        contextV[gpuid]->ForwardPropagation3(
-		d_dataV[gpuid], 
-		d_conv1V[gpuid], 
-		d_pool1V[gpuid], 
-		d_conv2V[gpuid], 
-		d_pool2V[gpuid], 
-		d_fc1V[gpuid], 
-		d_fc1reluV[gpuid], 
-		d_fc2V[gpuid], 
-		d_fc2smaxV[gpuid], 
-		d_pconv1V[gpuid], 
-		d_pconv1biasV[gpuid], 
-		d_pconv2V[gpuid], 
-		d_pconv2biasV[gpuid], 
-		d_pfc1V[gpuid], 
-		d_pfc1biasV[gpuid], 
-		d_pfc2V[gpuid], 
-		d_pfc2biasV[gpuid],
-		d_cudnn_workspaceV[gpuid], 
-		d_onevecV[gpuid]
-		);
+//              size_t sz=sizeof(float) * contextV[gpuid]->m_batchSize * conv2V[gpuid].out_channels * (conv2V[gpuid].out_height / pool2V[gpuid].stride) * (conv2V[gpuid].out_width / pool2V[gpuid].stride);
+//                      checkCudaErrors(cudaMemPrefetchAsync(d_pool2V[gpuid],sz,gpuid));
+
+	  contextV[gpuid]->ForwardPropagation3 (d_dataV[gpuid],
+						d_conv1V[gpuid],
+						d_pool1V[gpuid],
+						d_conv2V[gpuid],
+						d_pool2V[gpuid],
+						d_fc1V[gpuid],
+						d_fc1reluV[gpuid],
+						d_fc2V[gpuid],
+						d_fc2smaxV[gpuid],
+						d_pconv1V[gpuid],
+						d_pconv1biasV[gpuid],
+						d_pconv2V[gpuid],
+						d_pconv2biasV[gpuid],
+						d_pfc1V[gpuid],
+						d_pfc1biasV[gpuid],
+						d_pfc2V[gpuid],
+						d_pfc2biasV[gpuid],
+						d_cudnn_workspaceV[gpuid],
+						d_onevecV[gpuid]);
 	}
-
-
       // Backward propagation
 // ssy remove this temproally
 //        pcontext->Backpropagation(conv1, pool1, conv2, pool2,
