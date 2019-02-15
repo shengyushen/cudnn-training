@@ -1,45 +1,46 @@
-./trainlenet  50 1000 0 1
-./trainlenet  50 1000 1 0.0001
-./trainlenet  50 1000 1 0.001
-./trainlenet  50 1000 1 0.01
-./trainlenet  50 1000 1 0.03
-./trainlenet  50 1000 1 0.1
-./trainlenet  50 1000 1 0.3
-./trainlenet  50 1000 1 1
+./cudnnModelParallel.exe  50  100 16 256 0 1
+./cudnnModelParallel.exe  50  100 16 256 1 0.0001
+./cudnnModelParallel.exe  50  100 16 256 1 0.001
+./cudnnModelParallel.exe  50  100 16 256 1 0.01
+./cudnnModelParallel.exe  50  100 16 256 1 0.03
+./cudnnModelParallel.exe  50  100 16 256 1 0.1
+./cudnnModelParallel.exe  50  100 16 256 1 0.3
+./cudnnModelParallel.exe  50  100 16 256 1 1
 
-./trainlenet  100 1000 0 1
-./trainlenet  100 1000 1 0.0001
-./trainlenet  100 1000 1 0.001
-./trainlenet  100 1000 1 0.01
-./trainlenet  100 1000 1 0.03
-./trainlenet  100 1000 1 0.1
-./trainlenet  100 1000 1 0.3
-./trainlenet  100 1000 1 1
+./cudnnModelParallel.exe  100 100 16 256 0 1
+./cudnnModelParallel.exe  100 100 16 256 1 0.0001
+./cudnnModelParallel.exe  100 100 16 256 1 0.001
+./cudnnModelParallel.exe  100 100 16 256 1 0.01
+./cudnnModelParallel.exe  100 100 16 256 1 0.03
+./cudnnModelParallel.exe  100 100 16 256 1 0.1
+./cudnnModelParallel.exe  100 100 16 256 1 0.3
+./cudnnModelParallel.exe  100 100 16 256 1 1
 
-./trainlenet  200 100 0 1
-./trainlenet  200 100 1 0.0001
-./trainlenet  200 100 1 0.001
-./trainlenet  200 100 1 0.01
-./trainlenet  200 100 1 0.03
-./trainlenet  200 100 1 0.1
-./trainlenet  200 100 1 0.3
-./trainlenet  200 100 1 1
+./cudnnModelParallel.exe  200 100 16 256 0 1
+./cudnnModelParallel.exe  200 100 16 256 1 0.0001
+./cudnnModelParallel.exe  200 100 16 256 1 0.001
+./cudnnModelParallel.exe  200 100 16 256 1 0.01
+./cudnnModelParallel.exe  200 100 16 256 1 0.03
+./cudnnModelParallel.exe  200 100 16 256 1 0.1
+./cudnnModelParallel.exe  200 100 16 256 1 0.3
+./cudnnModelParallel.exe  200 100 16 256 1 1
 
-./trainlenet  400 100 0 1
-./trainlenet  400 100 1 0.0001
-./trainlenet  400 100 1 0.001
-./trainlenet  400 100 1 0.01
-./trainlenet  400 100 1 0.03
-./trainlenet  400 100 1 0.1
-./trainlenet  400 100 1 0.3
-./trainlenet  400 100 1 1
+./cudnnModelParallel.exe  400 100 16 256 0 1
+./cudnnModelParallel.exe  400 100 16 256 1 0.0001
+./cudnnModelParallel.exe  400 100 16 256 1 0.001
+./cudnnModelParallel.exe  400 100 16 256 1 0.01
+./cudnnModelParallel.exe  400 100 16 256 1 0.03
+./cudnnModelParallel.exe  400 100 16 256 1 0.1
+./cudnnModelParallel.exe  400 100 16 256 1 0.3
+./cudnnModelParallel.exe  400 100 16 256 1 1
 
-./trainlenet  800 100 0 1
-./trainlenet  800 100 1 0.0001
-./trainlenet  800 100 1 0.001
-./trainlenet  800 100 1 0.01
-./trainlenet  800 100 1 0.03
-./trainlenet  800 100 1 0.1
-./trainlenet  800 100 1 0.3
-./trainlenet  800 100 1 1
+./cudnnModelParallel.exe  800 100 16 256 0 1
+./cudnnModelParallel.exe  800 100 16 256 1 0.0001
+./cudnnModelParallel.exe  800 100 16 256 1 0.001
+./cudnnModelParallel.exe  800 100 16 256 1 0.01
+./cudnnModelParallel.exe  800 100 16 256 1 0.03
+./cudnnModelParallel.exe  800 100 16 256 1 0.1
+./cudnnModelParallel.exe  800 100 16 256 1 0.3
+./cudnnModelParallel.exe  800 100 16 256 1 1
+
 

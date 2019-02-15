@@ -34,29 +34,7 @@
 #include <cublas_v2.h>
 #include <cudnn.h>
 
-//#include "readubyte.h"
-
-///////////////////////////////////////////////////////////////////////////////////////////
-// Definitions and helper utilities
-
-// Block width for CUDA kernels
-#define BW 128
-
-#ifdef USE_GFLAGS
-#include <gflags/gflags.h>
-
-#ifndef _WIN32
-#define gflags google
-#endif
-#else
-    // Constant versions of gflags
-#define DEFINE_int32(flag, default_value, description) const int FLAGS_##flag = (default_value)
-#define DEFINE_uint64(flag, default_value, description) const unsigned long long FLAGS_##flag = (default_value)
-#define DEFINE_bool(flag, default_value, description) const bool FLAGS_##flag = (default_value)
-#define DEFINE_double(flag, default_value, description) const double FLAGS_##flag = (default_value)
-#define DEFINE_string(flag, default_value, description) const std::string FLAGS_##flag ((default_value))
-#endif
-
+using namespace std;
 
 //////////////////////////////////////////////////////////////////////////////
 // Error handling
@@ -93,7 +71,7 @@
 //seems to be a class like struct
 class baseModule{
 	public : 
-
+	string name;
   int in_channels, out_channels ;
   int in_width, in_height, out_width, out_height;
 
@@ -114,31 +92,34 @@ class baseModule{
 
 
 	void print() {
-					printf("in_channels %d\n",in_channels);
-					printf("out_channels %d\n",out_channels);
-					printf("in_width %d\n",in_width);
-					printf("in_height %d\n",in_height);
-					printf("out_width %d\n",out_width);
-					printf("out_height %d\n",out_height);
-					printf("inbuf_size %d\n",inbuf_size);
-					printf("outbuf_size %d\n",outbuf_size);
-					printf("minibatch %d\n",minibatch);
-					printf("gpuid %d\n",gpuid);
+					cout<<"name "<<name<<endl;
+					cout<<"in_channels "<<in_channels<<endl;
+					cout<<"out_channels "<<out_channels<<endl;
+					cout<<"in_width "<<in_width<<endl;
+					cout<<"in_height "<<in_height<<endl;
+					cout<<"out_width "<<out_width<<endl;
+					cout<<"out_height "<<out_height<<endl;
+					cout<<"inbuf_size "<<inbuf_size<<endl;
+					cout<<"outbuf_size "<<outbuf_size<<endl;
+					cout<<"minibatch "<<minibatch<<endl;
+					cout<<"gpuid "<<gpuid<<endl;
 	}
 	baseModule(
+									string name_,
   								cudnnHandle_t cudnnHandle_,
 								  cublasHandle_t cublasHandle_,
 									int gpuid_,
 									int minibatch_,
 									int in_c_,
 									int out_c_,
-									int in_w_,
 									int in_h_,
-									int out_w_,
+									int in_w_,
 									int out_h_,
+									int out_w_,
 									float * pin_
 									) 
 	{
+		name=name_;
 		cudnnHandle = cudnnHandle_;
 		cublasHandle = cublasHandle_;
 		gpuid = gpuid_;
@@ -179,6 +160,9 @@ class baseModule{
 	size_t getOutputFloatNumber() {
 					return outbuf_size;
 	}
+	size_t getInputFloatNumber() {
+					return inbuf_size;
+	}
 
 };
 
@@ -196,6 +180,7 @@ class ConvBiasLayer: public baseModule
 		cudnnConvolutionFwdAlgo_t algo;
 
     ConvBiasLayer (
+				string name_,
 				cudnnHandle_t cudnnHandle_,
 			  cublasHandle_t cublasHandle_,
 				int gpuid_,
@@ -206,21 +191,29 @@ class ConvBiasLayer: public baseModule
 				int paddingH_, int paddingW_,
 				float * pin_)  // pin pass from outside
 						: baseModule(
+									name_,
 									cudnnHandle_,
 									cublasHandle_,
 									gpuid_,
 									minibatch_,
 									in_channels_,
 									numFilter_,
-									in_w_,
 									in_h_,
-									(in_w_+paddingW_*2-kernel_size_+1)/stride_+1,
-									(in_h_+paddingH_*2-kernel_size_+1)/stride_+1,
+									in_w_,
+									(in_h_+paddingH_*2-kernel_size_+1)/stride_,
+									(in_w_+paddingW_*2-kernel_size_+1)/stride_,
 									pin_
 								)
 		{
+						printf("ConvBiasLayer gpuid %d minibatch %d in_channels_ %d in_h_ %d in_w_ %d numFilter_ %d kernel_size_ %d stride_ %d paddingH_ %d paddingW_ %d\n",
+						                      gpuid ,  minibatch ,  in_channels_ ,  in_h_ ,  in_w_ ,  numFilter_ ,  kernel_size_ ,  stride_ ,  paddingH_ ,  paddingW_ );
 				assert((in_w_+paddingW_*2-kernel_size_+1)%stride_ == 0);
 				assert((in_h_+paddingH_*2-kernel_size_+1)%stride_ == 0);
+
+				kernel_size = kernel_size_;
+				assert(kernel_size<16); //this is not strict, just to prevent unreasonable large kernel
+				stride=stride_;
+				assert(stride < 16);//also not strict
 
 				//bias descriptor
 				checkCUDNN (cudnnCreateTensorDescriptor (&biasTensor));
@@ -247,7 +240,7 @@ class ConvBiasLayer: public baseModule
     		checkCUDNN (cudnnCreateConvolutionDescriptor (&convDesc));
     		checkCUDNN (cudnnSetConvolution2dDescriptor (convDesc,
 						 paddingH_, paddingW_,
-						 kernel_size, kernel_size,
+						 stride, stride,
 						 1, 1, // we currently dont support dilation
 						 CUDNN_CROSS_CORRELATION,
 						 CUDNN_DATA_FLOAT));
@@ -399,11 +392,21 @@ class TrainingContext
 	}
 
 	baseModule * getCurrentLayer() {
-			assert(currentlayer >=0 && currentlayer<vmod.size());
+			assert(currentlayer >=0);
+			if(currentlayer >= vmod.size()) {
+					cout<<"currentlayer "<<currentlayer<<"vmod.size "<<vmod.size()<<endl;
+					assert(0);
+			}
 			return vmod[currentlayer];
 	}
+
 	void reset() {
 					currentlayer=0;
+	}
+
+	bool isFinished() {
+		 if(currentlayer>=vmod.size()) return true;
+		 else return false;
 	}
 
 	void finishAddMod () {
@@ -431,17 +434,18 @@ class TrainingContext
     checkCUDNN (cudnnDestroy (cudnnHandle));
   }
 
-	 bool ForwardPropagation1() {
-		 if(currentlayer>vmod.size()) {
-			return false;
+	 void ForwardPropagation1() {
+		 if(currentlayer>=vmod.size()) {
+ 		  cout<<"finished at layer "<<currentlayer<<endl;
+			assert(0);
 		 } else {
+				cout<<"layer "<<currentlayer<<endl;
         checkCudaErrors(cudaSetDevice(m_gpuid));
 
         // Conv1 layer
 				vmod[currentlayer]->run1step();
 				
 				currentlayer++;
-				return true;
 		 }
 	 }
 };
@@ -467,11 +471,11 @@ main (int argc, char **argv)
 		printf("Usage : cudnnModelParallel.exe <width> <iteration> <minbatch> <channel> <copy or not> <fract to copy>");
 		assert(0);
 	}
-  printf ("argc %d\n", argc);
+	cout<<"argc "<<argc<<endl;
   size_t width, height;
   width = atoi (argv[1]);
   height = width;
-  printf ("width %d\n", width);
+	cout<<"width "<<width<<endl;
   int iterations = atoi (argv[2]);
 	int minib = atoi(argv[3]);
 	int chnl = atoi(argv[4]);
@@ -481,13 +485,13 @@ main (int argc, char **argv)
   // Choose GPU
   int num_gpus;
   checkCudaErrors (cudaGetDeviceCount (&num_gpus));
-  printf ("using %d GPUs \n", num_gpus);
+	cout<<"num_gpus "<<num_gpus<<endl;
 
 	int deviceId;
 //  int numberOfSMs;
 	checkCudaErrors(cudaSetDevice(0));
 	cudaGetDevice(&deviceId);
-	printf ("deviceId %d\n", deviceId);
+	cout<<"deviceId "<<deviceId<<endl;
 //	cudaDeviceGetAttribute(&numberOfSMs, cudaDevAttrMultiProcessorCount, deviceId);
 	//printf("numberOfSMs %s\n",numberOfSMs);
 //  int threadsPerBlock = 256;
@@ -508,6 +512,7 @@ main (int argc, char **argv)
       TrainingContext * pcontext = new TrainingContext (gpuid, minib);
 
       class ConvBiasLayer * pconv1=new ConvBiasLayer (
+											"conv1",
 											pcontext->cudnnHandle,
 											pcontext->cublasHandle,
 											gpuid,
@@ -519,6 +524,7 @@ main (int argc, char **argv)
 											pdata
 											);
 			class ConvBiasLayer * pconv2=new ConvBiasLayer (
+											"conv2",
 											pcontext->cudnnHandle,
 											pcontext->cublasHandle,
 											gpuid,
@@ -530,6 +536,7 @@ main (int argc, char **argv)
 											pconv1->pout
 											);
 			class ConvBiasLayer * pconv3=new ConvBiasLayer (
+											"conv3",
 											pcontext->cudnnHandle,
 											pcontext->cublasHandle,
 											gpuid,
@@ -564,17 +571,16 @@ main (int argc, char **argv)
 		for(int gpuid=0;gpuid<num_gpus;gpuid++)     {
 						contextV[gpuid]->reset();
 		}
+
 		while(true) {
 			//run one layer
-			bool finished=false;
 		  for (int gpuid = 0; gpuid < num_gpus; gpuid++)
 			{
 				assert(contextV[gpuid]->m_gpuid == gpuid);
 			  checkCudaErrors (cudaSetDevice (gpuid));
-			  finished=contextV[gpuid]->ForwardPropagation1 ();
-				if(finished) break;
+			  contextV[gpuid]->ForwardPropagation1 ();
 			}
-			if(finished) break;
+			if(contextV[0]->isFinished()) break;
 			
 		  if (copy)
 			{
@@ -583,13 +589,13 @@ main (int argc, char **argv)
 			      //sync n+1 to n
 			      checkCudaErrors (cudaSetDevice (gpuid));
 						baseModule * pcurrent =contextV[gpuid]->getCurrentLayer();
-			      size_t sz = sizeof (float) * (pcurrent->getOutputFloatNumber() );
+			      size_t sz = sizeof (float) * (pcurrent->getInputFloatNumber() );
 						assert(sz>0);
-			      printf ("coping sz %d\n", sz);
+						cout<<"sz "<<sz<<endl;
 
 			      if (gpuid > 0) {
 							baseModule * pPrev =contextV[gpuid-1]->getCurrentLayer();
-							size_t szPrev = sizeof (float) * (pPrev->getOutputFloatNumber() );
+							size_t szPrev = sizeof (float) * (pPrev->getInputFloatNumber() );
 							assert(sz==szPrev);
 						  checkCudaErrors (cudaMemcpyAsync (pcurrent->pin + sz / (2 * sizeof (float)), pPrev->pin, int (fract * sz / 2), cudaMemcpyDefault));
 						}
@@ -607,9 +613,10 @@ main (int argc, char **argv)
   checkCudaErrors (cudaDeviceSynchronize ());
   auto t2 = std::chrono::high_resolution_clock::now ();
 
-  printf ("Iteration time: width %d fract %f time %f ms\n", width,
-	  copy ? fract : 0.0,
-	  std::chrono::duration_cast < std::chrono::microseconds >
-	  (t2 - t1).count () / 1000.0f / iterations);
+  cout<<"Iteration time: width "<<width
+			<<" fract "<<
+			(copy?fract:0.0)
+			<<" time " << std::chrono::duration_cast < std::chrono::microseconds > (t2 - t1).count () / 1000.0f / iterations
+		<<" ms"<<endl;
   return 0;
 }
