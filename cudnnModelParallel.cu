@@ -90,6 +90,8 @@ class baseModule{
 	size_t m_workspaceSizeByte;
 	void * p_workspace;
 
+	bool bNeedSyncInTensor;
+
 
 	void print() {
 					cout<<"name "<<name<<endl;
@@ -135,6 +137,7 @@ class baseModule{
 		outbuf_size = minibatch_*out_c_*out_w_*out_h_;
 		m_workspaceSizeByte=0;
 		p_workspace=NULL;
+		bNeedSyncInTensor=true;
 
 		assert(gpuid>=0);
 		assert(minibatch >0);
@@ -222,6 +225,7 @@ class ConvBiasLayer: public baseModule
 
 				//set the source tensor
     		checkCUDNN (cudnnCreateTensorDescriptor (&srcTensorDesc));
+				//this may fail in 800 pixel because the cudnnSetTensor4dDescriptor require the tensor smaller than 2GB, so I may need 700
     		checkCUDNN (cudnnSetTensor4dDescriptor (srcTensorDesc,
 					    CUDNN_TENSOR_NCHW,
 					    CUDNN_DATA_FLOAT, minibatch, in_channels, in_height, in_width));
