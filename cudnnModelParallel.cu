@@ -195,17 +195,19 @@ class MaxPoolLayer: public baseModule {
 									in_channels_, // it seems the output channle is the same as input
 									in_h_,
 									in_w_,
-									(in_h_+paddingH_*2-kernel_size_+1)/stride_,
-									(in_w_+paddingW_*2-kernel_size_+1)/stride_,
+									(in_h_+paddingH_*2-kernel_size_)/stride_+1,
+									(in_w_+paddingW_*2-kernel_size_)/stride_+1,
 									pin_
 								)
 	{
+				printf("MaxPoolLayer gpuid %d minibatch %d in_channels_ %d in_h_ %d in_w_ %d kernel_size_ %d stride_ %d paddingH_ %d paddingW_ %d\n",
+						                      gpuid ,  minibatch ,  in_channels_ ,  in_h_ ,  in_w_ ,   kernel_size_ ,  stride_ ,  paddingH_ ,  paddingW_ );
 		size= kernel_size_;
 		stride = stride_;
 		assert(size > 0);
 		assert(stride > 0);
-		assert((in_w_+paddingW_*2-kernel_size_+1)%stride_ == 0);
-		assert((in_h_+paddingH_*2-kernel_size_+1)%stride_ == 0);
+		assert((in_w_+paddingW_*2-kernel_size_)%stride_ == 0);
+		assert((in_h_+paddingH_*2-kernel_size_)%stride_ == 0);
 
 		//all layer follow this pattern
 		// 1 set the source tensor
@@ -252,6 +254,11 @@ class MaxPoolLayer: public baseModule {
                                        pin, &beta, dstTensorDesc,pout));
 
 	}
+	~MaxPoolLayer() {
+		checkCUDNN (cudnnDestroyTensorDescriptor(srcTensorDesc));
+		checkCUDNN (cudnnDestroyPoolingDescriptor(poolDesc));
+    checkCUDNN (cudnnDestroyTensorDescriptor (dstTensorDesc));
+	}
 };
 
 class ConvBiasLayer: public baseModule
@@ -288,15 +295,15 @@ class ConvBiasLayer: public baseModule
 									numFilter_,
 									in_h_,
 									in_w_,
-									(in_h_+paddingH_*2-kernel_size_+1)/stride_,
-									(in_w_+paddingW_*2-kernel_size_+1)/stride_,
+									(in_h_+paddingH_*2-kernel_size_)/stride_+1,
+									(in_w_+paddingW_*2-kernel_size_)/stride_+1,
 									pin_
 								)
 		{
-						printf("ConvBiasLayer gpuid %d minibatch %d in_channels_ %d in_h_ %d in_w_ %d numFilter_ %d kernel_size_ %d stride_ %d paddingH_ %d paddingW_ %d\n",
-						                      gpuid ,  minibatch ,  in_channels_ ,  in_h_ ,  in_w_ ,  numFilter_ ,  kernel_size_ ,  stride_ ,  paddingH_ ,  paddingW_ );
-				assert((in_w_+paddingW_*2-kernel_size_+1)%stride_ == 0);
-				assert((in_h_+paddingH_*2-kernel_size_+1)%stride_ == 0);
+				printf("ConvBiasLayer gpuid %d minibatch %d in_channels_ %d in_h_ %d in_w_ %d numFilter_ %d kernel_size_ %d stride_ %d paddingH_ %d paddingW_ %d out_height %d out_width %d\n",
+						                      gpuid ,  minibatch ,  in_channels_ ,  in_h_ ,  in_w_ ,  numFilter_ ,  kernel_size_ ,  stride_ ,  paddingH_ ,  paddingW_ , (in_h_+paddingH_*2-kernel_size_)/stride_+1, (in_w_+paddingW_*2-kernel_size_)/stride_+1);
+				assert((in_w_+paddingW_*2-kernel_size_)%stride_ == 0);
+				assert((in_h_+paddingH_*2-kernel_size_)%stride_ == 0);
 
 				kernel_size = kernel_size_;
 				assert(kernel_size<16); //this is not strict, just to prevent unreasonable large kernel
@@ -343,6 +350,10 @@ class ConvBiasLayer: public baseModule
 				assert(c=out_channels);
 				assert(h==out_height);
 				assert(w==out_width);
+				cout<<"minibatch "<<minibatch<<endl;
+				cout<<"out_channels "<<out_channels<<endl;
+				cout<<"out_height "<<out_height<<endl;
+				cout<<"out_width "<<out_width<<endl;
 
     		checkCUDNN (cudnnCreateTensorDescriptor (&dstTensorDesc));
     		checkCUDNN (cudnnSetTensor4dDescriptor (dstTensorDesc,
@@ -362,15 +373,18 @@ class ConvBiasLayer: public baseModule
 							 convDesc,
 							 dstTensorDesc,
 							 algo, &m_workspaceSizeByte));
+				//assert(m_workspaceSizeByte >0);
 
-				bNeedSyncInTensor = true;
+				bNeedSyncInTensor = kernel_size_ >1; // bigger than 1 need to consider data from neighbour
 		}
 	void run1step () {
-				assert(p_workspace!=NULL);
-				assert(m_workspaceSizeByte!=0);
+					//this may not be neccessary
+//				if(p_workspace==NULL) 
+//					cout<<"WARNING : gpuid "<< gpuid<<" p_workspace is empty"<<endl;
+//				if(m_workspaceSizeByte==0) 
+//					cout<<"WARNING : gpuid "<< gpuid<<" m_workspaceSizeByte is zero"<<endl;
         float alpha = 1.0f, beta = 0.0f;
         checkCudaErrors(cudaSetDevice(gpuid));
-				assert(p_workspace);
         checkCUDNN(cudnnConvolutionForward(cudnnHandle, 
 																					&alpha, 
 																					srcTensorDesc, pin, 
@@ -462,9 +476,15 @@ class TrainingContext
 		size_t maxsize=0;
 		for(int i=0;i<vmod.size();i++) {
 			maxsize = max(maxsize,vmod[i]->m_workspaceSizeByte);
+			cout<<"maxsize "<<vmod[i]->m_workspaceSizeByte <<endl;
 		}
 		//alloc new size
-		checkCudaErrors(cudaMallocManaged(&pworkspace,maxsize));
+		if(maxsize>0) {
+			checkCudaErrors(cudaMallocManaged(&pworkspace,maxsize));
+		} else {
+						maxsize = 0;
+						pworkspace=NULL;
+		}
 		for(int i=0;i<vmod.size();i++) {
 				vmod[i]->p_workspace = pworkspace;
 				vmod[i]->m_workspaceSizeByte=maxsize;
@@ -514,7 +534,7 @@ struct runingConfig {
 	size_t width, height;
 	int iterations;
 	int minib;
-	int chnl;
+//	int chnl;
 	bool copy;
 	float fract;
 	int num_gpus;
@@ -522,12 +542,96 @@ struct runingConfig {
 	vector <TrainingContext * > * pcontextV;
 };
 
+void construct_Lenet(struct runingConfig * prc ){
+	size_t width = prc->width;
+	size_t height = prc->height;
+//	int iterations = prc->iterations;
+	int minib = prc->minib;
+	int chnl = 3;
+//	bool copy = prc->copy;
+//	float fract = prc->fract;
+	int num_gpus = prc->num_gpus;
+	vector < float *> * pd_dataV=prc->pd_dataV;
+	vector <TrainingContext * > * pcontextV = prc->pcontextV;
+  for (int gpuid = 0; gpuid < num_gpus; gpuid++)
+    {
+      checkCudaErrors (cudaSetDevice (gpuid));
+			//alloc the input data
+			float * pdata;
+			size_t input_sz = minib*chnl*width*height;
+			checkCudaErrors(cudaMallocManaged(&pdata,sizeof(float)*input_sz));
+			//the context for this gpu
+      TrainingContext * pcontext = new TrainingContext (gpuid, minib);
+
+      class ConvBiasLayer * pconv1=new ConvBiasLayer (
+											"conv1",
+											pcontext->cudnnHandle,
+											pcontext->cublasHandle,
+											gpuid,
+											minib,
+											chnl,
+											height,width, 
+											20,5,1,
+											0,0,
+											pdata
+											);
+			class MaxPoolLayer * ppool1=new MaxPoolLayer (
+											"pool1",
+											pcontext->cudnnHandle,
+											pcontext->cublasHandle,
+											gpuid,
+											minib,
+											pconv1->out_channels,
+											pconv1->out_height, pconv1->out_width,
+											2,2,
+											0,0,
+											pconv1->pout
+											);
+			class ConvBiasLayer * pconv2=new ConvBiasLayer (
+											"conv2",
+											pcontext->cudnnHandle,
+											pcontext->cublasHandle,
+											gpuid,
+											minib,
+											ppool1->out_channels,
+											ppool1->out_height, ppool1 ->out_width,
+											50,5,1,
+											0,0,
+											ppool1->pout
+											);
+			class MaxPoolLayer * ppool2=new MaxPoolLayer (
+											"pool2",
+											pcontext->cudnnHandle,
+											pcontext->cublasHandle,
+											gpuid,
+											minib,
+											pconv2->out_channels,
+											pconv2->out_height, pconv2->out_width,
+											2,2,
+											0,0,
+											pconv2->pout
+											);
+
+			pcontext -> addMod(pconv1);
+			pcontext -> addMod(ppool1);
+			pcontext -> addMod(pconv2);
+			pcontext -> addMod(ppool2);
+			pcontext -> finishAddMod();
+
+      pcontextV->push_back (pcontext);
+			pd_dataV->push_back(pdata);
+	}
+
+	for (int gpuid = 0; gpuid < num_gpus; gpuid++) {
+					(*pcontextV)[gpuid]-> print();
+	}
+}
 void construct_Resnet(struct runingConfig * prc ){
 	size_t width = prc->width;
 	size_t height = prc->height;
 //	int iterations = prc->iterations;
 	int minib = prc->minib;
-	int chnl = prc->chnl;
+	int chnl = 3;
 //	bool copy = prc->copy;
 //	float fract = prc->fract;
 	int num_gpus = prc->num_gpus;
@@ -601,17 +705,20 @@ int
 main (int argc, char **argv)
 {
   if (argc != 7) {
-		printf("Usage : cudnnModelParallel.exe <width> <iteration> <minbatch> <channel> <copy or not> <fract to copy>");
+		printf("Usage : cudnnModelParallel.exe <nettype> <iteration> <minbatch> <width>  <copy or not> <fract to copy> ");
 		assert(0);
 	}
+
 	cout<<"argc "<<argc<<endl;
-  size_t width, height;
-  width = atoi (argv[1]);
-  height = width;
-	cout<<"width "<<width<<endl;
+	char * nettype =argv[1];
   int iterations = atoi (argv[2]);
 	int minib = atoi(argv[3]);
-	int chnl = atoi(argv[4]);
+
+  size_t width, height;
+  width = atoi (argv[4]);
+  height = width;
+	cout<<"width "<<width<<endl;
+
   bool copy = (atoi (argv[5]) > 0);
   float fract = (atof (argv[6]));
 
@@ -640,14 +747,21 @@ main (int argc, char **argv)
 	rc.height = height;
 	rc.iterations = iterations;
 	rc.minib = minib;
-	rc.chnl = chnl;
+//	rc.chnl = chnl;
 	rc.copy = copy;
 	rc.fract = fract;
 	rc.num_gpus=num_gpus;
 	rc.pd_dataV = & d_dataV;
 	rc.pcontextV= & contextV;
 
-	construct_Resnet(&rc);
+	if(strcmp(nettype,"resnet")==0) {
+		cout<<"resnet"<<endl;
+		construct_Resnet(&rc);
+	} else if(strcmp(nettype,"lenet")==0) {
+		cout<<"lenet"<<endl;
+		construct_Lenet(&rc);
+	}
+
   checkCudaErrors (cudaDeviceSynchronize ());
 
   // Use SGD to train the network
@@ -666,6 +780,7 @@ main (int argc, char **argv)
 				assert(contextV[gpuid]->m_gpuid == gpuid);
 			  checkCudaErrors (cudaSetDevice (gpuid));
 			  contextV[gpuid]->ForwardPropagation1 ();
+				assert(contextV[gpuid]->currentlayer >0);
 			}
 			if(contextV[0]->isFinished()) break;
 			
@@ -680,11 +795,13 @@ main (int argc, char **argv)
 						assert(sz>0);
 						cout<<"sz "<<sz<<endl;
 
-			      if (gpuid > 0) {
+			      if (gpuid > 0 && pcurrent-> bNeedSyncInTensor) {
 							baseModule * pPrev =contextV[gpuid-1]->getCurrentLayer();
 							size_t szPrev = sizeof (float) * (pPrev->getInputFloatNumber() );
 							assert(sz==szPrev);
 						  checkCudaErrors (cudaMemcpyAsync (pcurrent->pin + sz / (2 * sizeof (float)), pPrev->pin, int (fract * sz / 2), cudaMemcpyDefault));
+						} else {
+							cout <<"No need to sync : gpuid "<<gpuid << "layer "<<pcurrent->name<<endl;
 						}
 			  }
 		
