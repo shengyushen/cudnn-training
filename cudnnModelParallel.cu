@@ -765,6 +765,7 @@ main (int argc, char **argv)
   checkCudaErrors (cudaDeviceSynchronize ());
 
   // Use SGD to train the network
+	size_t totalsize=0;
   auto t1 = chrono::high_resolution_clock::now ();
   for (int iter = 0; iter < iterations; ++iter)
   {
@@ -799,7 +800,10 @@ main (int argc, char **argv)
 							baseModule * pPrev =contextV[gpuid-1]->getCurrentLayer();
 							size_t szPrev = sizeof (float) * (pPrev->getInputFloatNumber() );
 							assert(sz==szPrev);
-						  checkCudaErrors (cudaMemcpyAsync (pcurrent->pin + sz / (2 * sizeof (float)), pPrev->pin, int (fract * sz / 2), cudaMemcpyDefault));
+							size_t tobetransfered = int (fract * sz / 2);
+							if(gpuid == num_gpus-1)
+								totalsize = totalsize+tobetransfered;
+						  checkCudaErrors (cudaMemcpyAsync (pcurrent->pin + sz / (2 * sizeof (float)), pPrev->pin, tobetransfered, cudaMemcpyDefault));
 						} else {
 							cout <<"No need to sync : gpuid "<<gpuid << "layer "<<pcurrent->name<<endl;
 						}
@@ -818,8 +822,8 @@ main (int argc, char **argv)
   auto t2 = chrono::high_resolution_clock::now ();
 
   cout<<"Iteration time: width "<<width
-			<<" fract "<<
-			(copy?fract:0.0)
+			<<" fract "<< (copy?fract:0.0)
+			<<" totalsize "<< totalsize/iterations
 			<<" time " << chrono::duration_cast < chrono::microseconds > (t2 - t1).count () / 1000.0f / iterations
 		<<" ms"<<endl;
   return 0;
