@@ -169,6 +169,91 @@ class baseModule{
 
 };
 
+class MaxPoolLayer: public baseModule {
+	public :
+	int size, stride;
+	cudnnTensorDescriptor_t srcTensorDesc;
+  cudnnPoolingDescriptor_t poolDesc;
+	cudnnTensorDescriptor_t  dstTensorDesc; //this out already have pout in baseModule
+	MaxPoolLayer(
+			string name_,
+			cudnnHandle_t cudnnHandle_,
+			cublasHandle_t cublasHandle_,
+			int gpuid_,
+			int minibatch_,
+			int in_channels_, 
+			int in_h_, int in_w_, 
+			int kernel_size_, int stride_, //it seems pooling just remain the same number of channel as input
+			int paddingH_, int paddingW_,float * pin_) 
+					: baseModule(
+									name_,
+									cudnnHandle_,
+									cublasHandle_,
+									gpuid_,
+									minibatch_,
+									in_channels_,
+									in_channels_, // it seems the output channle is the same as input
+									in_h_,
+									in_w_,
+									(in_h_+paddingH_*2-kernel_size_+1)/stride_,
+									(in_w_+paddingW_*2-kernel_size_+1)/stride_,
+									pin_
+								)
+	{
+		size= kernel_size_;
+		stride = stride_;
+		assert(size > 0);
+		assert(stride > 0);
+		assert((in_w_+paddingW_*2-kernel_size_+1)%stride_ == 0);
+		assert((in_h_+paddingH_*2-kernel_size_+1)%stride_ == 0);
+
+		//all layer follow this pattern
+		// 1 set the source tensor
+		// 2 set the operator tensor
+		// 3 set the dest tensor
+
+		// 1 set the source tensor
+    checkCUDNN (cudnnCreateTensorDescriptor (&srcTensorDesc));
+    checkCUDNN(cudnnSetTensor4dDescriptor(srcTensorDesc,
+                                              CUDNN_TENSOR_NCHW,
+                                              CUDNN_DATA_FLOAT,
+																							minibatch, in_channels, in_height, in_width
+                                              ));
+
+		// 2 set the operator tensor
+    checkCUDNN(cudnnCreatePoolingDescriptor(&poolDesc));
+    checkCUDNN(cudnnSetPooling2dDescriptor(poolDesc,
+                                               CUDNN_POOLING_MAX,
+                                               CUDNN_PROPAGATE_NAN,
+                                               size, size,
+                                               paddingH_,paddingW_ ,
+                                               stride, stride));
+
+		// 3 set the dest tensor
+    checkCUDNN (cudnnCreateTensorDescriptor (&dstTensorDesc));
+    checkCUDNN (cudnnSetTensor4dDescriptor (dstTensorDesc,
+					    CUDNN_TENSOR_NCHW,
+					    CUDNN_DATA_FLOAT, minibatch_, in_channels_, (in_h_+paddingH_*2-kernel_size_+1)/stride_, (in_w_+paddingW_*2-kernel_size_+1)/stride_));
+		
+
+
+		// should not be sync
+		bNeedSyncInTensor = false;
+		m_workspaceSizeByte =0;
+
+	}
+	void run1step () {
+				//pooling layer dont need workspace
+				//assert(p_workspace!=NULL);
+				//assert(m_workspaceSizeByte!=0);
+        checkCudaErrors(cudaSetDevice(gpuid));
+        float alpha = 1.0f, beta = 0.0f;
+        checkCUDNN(cudnnPoolingForward(cudnnHandle, poolDesc, &alpha, srcTensorDesc,
+                                       pin, &beta, dstTensorDesc,pout));
+
+	}
+};
+
 class ConvBiasLayer: public baseModule
 {
 		public :
@@ -277,6 +362,8 @@ class ConvBiasLayer: public baseModule
 							 convDesc,
 							 dstTensorDesc,
 							 algo, &m_workspaceSizeByte));
+
+				bNeedSyncInTensor = true;
 		}
 	void run1step () {
 				assert(p_workspace!=NULL);
@@ -308,48 +395,6 @@ class ConvBiasLayer: public baseModule
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////
-// GPU Kernels
-
-/**
- * Fills a floating-point array with ones.
- *
- * @param vec The array to fill.
- * @param size The number of elements in the array.
- */
-__global__ void
-FillOnes (float *vec, int size)
-{
-  int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  if (idx >= size)
-    return;
-
-  vec[idx] = 1.0f;
-}
-
-/**
- * Computes the backpropagation results of the Softmax loss for each result in a batch.
- * Uses the softmax values obtained from forward propagation to compute the difference.
- *
- * @param label The training batch label values.
- * @param num_labels The number of possible labels.
- * @param batch_size The size of the trained batch.
- * @param diff The resulting gradient.
- */
-__global__ void
-SoftmaxLossBackprop (const float *label, int num_labels, int batch_size,
-		     float *diff)
-{
-  int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  if (idx >= batch_size)
-    return;
-
-  const int label_value = static_cast < int >(label[idx]);
-
-  // For each item in the batch, decrease the result of the label's value by 1
-  diff[idx * num_labels + label_value] -= 1.0f;
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////
 // CUDNN/CUBLAS training context
 
 class TrainingContext
@@ -363,7 +408,7 @@ class TrainingContext
 	//only the first tensor is need to store here
   cudnnTensorDescriptor_t dataTensor;
 
-	std::vector<class baseModule *> vmod;
+	vector<class baseModule *> vmod;
 	int currentlayer;
 
 	void * pworkspace;
@@ -416,7 +461,7 @@ class TrainingContext
 	void finishAddMod () {
 		size_t maxsize=0;
 		for(int i=0;i<vmod.size();i++) {
-			maxsize = std::max(maxsize,vmod[i]->m_workspaceSizeByte);
+			maxsize = max(maxsize,vmod[i]->m_workspaceSizeByte);
 		}
 		//alloc new size
 		checkCudaErrors(cudaMallocManaged(&pworkspace,maxsize));
@@ -465,46 +510,29 @@ ssyinitfloat (float *p, size_t n)
     }
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////
-// Main function
-//#define WIDTH 280
-int
-main (int argc, char **argv)
-{
-  if (argc != 7) {
-		printf("Usage : cudnnModelParallel.exe <width> <iteration> <minbatch> <channel> <copy or not> <fract to copy>");
-		assert(0);
-	}
-	cout<<"argc "<<argc<<endl;
-  size_t width, height;
-  width = atoi (argv[1]);
-  height = width;
-	cout<<"width "<<width<<endl;
-  int iterations = atoi (argv[2]);
-	int minib = atoi(argv[3]);
-	int chnl = atoi(argv[4]);
-  bool copy = (atoi (argv[5]) > 0);
-  float fract = (atof (argv[6]));
+struct runingConfig {
+	size_t width, height;
+	int iterations;
+	int minib;
+	int chnl;
+	bool copy;
+	float fract;
+	int num_gpus;
+  vector < float *> * pd_dataV;
+	vector <TrainingContext * > * pcontextV;
+};
 
-  // Choose GPU
-  int num_gpus;
-  checkCudaErrors (cudaGetDeviceCount (&num_gpus));
-	cout<<"num_gpus "<<num_gpus<<endl;
-
-	int deviceId;
-//  int numberOfSMs;
-	checkCudaErrors(cudaSetDevice(0));
-	cudaGetDevice(&deviceId);
-	cout<<"deviceId "<<deviceId<<endl;
-//	cudaDeviceGetAttribute(&numberOfSMs, cudaDevAttrMultiProcessorCount, deviceId);
-	//printf("numberOfSMs %s\n",numberOfSMs);
-//  int threadsPerBlock = 256;
-//  int numberOfBlocks = 32*80 ;
-
-
-  std::vector < float *>d_dataV;
-	std::vector <TrainingContext * >contextV;
-
+void construct_Resnet(struct runingConfig * prc ){
+	size_t width = prc->width;
+	size_t height = prc->height;
+//	int iterations = prc->iterations;
+	int minib = prc->minib;
+	int chnl = prc->chnl;
+//	bool copy = prc->copy;
+//	float fract = prc->fract;
+	int num_gpus = prc->num_gpus;
+	vector < float *> * pd_dataV=prc->pd_dataV;
+	vector <TrainingContext * > * pcontextV = prc->pcontextV;
   for (int gpuid = 0; gpuid < num_gpus; gpuid++)
     {
       checkCudaErrors (cudaSetDevice (gpuid));
@@ -557,18 +585,73 @@ main (int argc, char **argv)
 			pcontext -> addMod(pconv3);
 			pcontext -> finishAddMod();
 
-      contextV.push_back (pcontext);
-			d_dataV.push_back(pdata);
+      pcontextV->push_back (pcontext);
+			pd_dataV->push_back(pdata);
 	}
 
 	for (int gpuid = 0; gpuid < num_gpus; gpuid++) {
-					contextV[gpuid]-> print();
+					(*pcontextV)[gpuid]-> print();
 	}
+}
 
+///////////////////////////////////////////////////////////////////////////////////////////
+// Main function
+//#define WIDTH 280
+int
+main (int argc, char **argv)
+{
+  if (argc != 7) {
+		printf("Usage : cudnnModelParallel.exe <width> <iteration> <minbatch> <channel> <copy or not> <fract to copy>");
+		assert(0);
+	}
+	cout<<"argc "<<argc<<endl;
+  size_t width, height;
+  width = atoi (argv[1]);
+  height = width;
+	cout<<"width "<<width<<endl;
+  int iterations = atoi (argv[2]);
+	int minib = atoi(argv[3]);
+	int chnl = atoi(argv[4]);
+  bool copy = (atoi (argv[5]) > 0);
+  float fract = (atof (argv[6]));
+
+  // Choose GPU
+  int num_gpus;
+  checkCudaErrors (cudaGetDeviceCount (&num_gpus));
+	cout<<"num_gpus "<<num_gpus<<endl;
+
+	int deviceId;
+//  int numberOfSMs;
+	checkCudaErrors(cudaSetDevice(0));
+	cudaGetDevice(&deviceId);
+	cout<<"deviceId "<<deviceId<<endl;
+//	cudaDeviceGetAttribute(&numberOfSMs, cudaDevAttrMultiProcessorCount, deviceId);
+	//printf("numberOfSMs %s\n",numberOfSMs);
+//  int threadsPerBlock = 256;
+//  int numberOfBlocks = 32*80 ;
+
+
+  vector < float *>d_dataV;
+	vector <TrainingContext * >contextV;
+	
+	//construct the resnet
+	struct runingConfig rc;
+	rc.width =width;
+	rc.height = height;
+	rc.iterations = iterations;
+	rc.minib = minib;
+	rc.chnl = chnl;
+	rc.copy = copy;
+	rc.fract = fract;
+	rc.num_gpus=num_gpus;
+	rc.pd_dataV = & d_dataV;
+	rc.pcontextV= & contextV;
+
+	construct_Resnet(&rc);
   checkCudaErrors (cudaDeviceSynchronize ());
 
   // Use SGD to train the network
-  auto t1 = std::chrono::high_resolution_clock::now ();
+  auto t1 = chrono::high_resolution_clock::now ();
   for (int iter = 0; iter < iterations; ++iter)
   {
 		//reset
@@ -615,12 +698,12 @@ main (int argc, char **argv)
   }				// end of iteration
 
   checkCudaErrors (cudaDeviceSynchronize ());
-  auto t2 = std::chrono::high_resolution_clock::now ();
+  auto t2 = chrono::high_resolution_clock::now ();
 
   cout<<"Iteration time: width "<<width
 			<<" fract "<<
 			(copy?fract:0.0)
-			<<" time " << std::chrono::duration_cast < std::chrono::microseconds > (t2 - t1).count () / 1000.0f / iterations
+			<<" time " << chrono::duration_cast < chrono::microseconds > (t2 - t1).count () / 1000.0f / iterations
 		<<" ms"<<endl;
   return 0;
 }
