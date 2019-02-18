@@ -62,6 +62,7 @@ using namespace std;
     std::stringstream _error;                                          \
     if (status != 0) {                                                 \
       _error << "Cuda failure: " << status;                            \
+			_error << cudaGetErrorString(status) ;                           \
       FatalError(_error.str());                                        \
     }                                                                  \
 } while(0)
@@ -134,7 +135,6 @@ class baseModule{
 		out_height = out_h_;
 		pin = pin_;
 		inbuf_size = minibatch_*in_c_*in_w_*in_h_;
-		outbuf_size = minibatch_*out_c_*out_w_*out_h_;
 		m_workspaceSizeByte=0;
 		p_workspace=NULL;
 		bNeedSyncInTensor=true;
@@ -148,7 +148,14 @@ class baseModule{
 		assert(out_width >0);
 		assert(out_height >0);
 		assert(pin );
+	}
 
+	void allocPout(int minibatch_,int out_c_,int out_h_,int out_w_) {
+		minibatch = minibatch_;
+		out_channels = out_c_;
+		out_width = out_w_;
+		out_height = out_h_;
+		outbuf_size = minibatch_*out_c_*out_w_*out_h_;
 		checkCudaErrors(cudaSetDevice(gpuid));
     checkCudaErrors (cudaMallocManaged (&pout, sizeof (float) *outbuf_size ));
     checkCudaErrors (cudaMemAdvise (pout,sizeof(float)* outbuf_size ,cudaMemAdviseSetPreferredLocation,gpuid));
@@ -201,14 +208,15 @@ class MaxPoolLayer: public baseModule {
 								)
 	{
 				printf("MaxPoolLayer gpuid %d minibatch %d in_channels_ %d in_h_ %d in_w_ %d kernel_size_ %d stride_ %d paddingH_ %d paddingW_ %d\n",
-						                      gpuid ,  minibatch ,  in_channels_ ,  in_h_ ,  in_w_ ,   kernel_size_ ,  stride_ ,  paddingH_ ,  paddingW_ );
+						                      gpuid_ ,  minibatch_ ,  in_channels_ ,  in_h_ ,  in_w_ ,   kernel_size_ ,  stride_ ,  paddingH_ ,  paddingW_ );
 		size= kernel_size_;
 		stride = stride_;
 		assert(size > 0);
 		assert(stride > 0);
-		assert((in_w_+paddingW_*2-kernel_size_)%stride_ == 0);
-		assert((in_h_+paddingH_*2-kernel_size_)%stride_ == 0);
+//		assert((in_w_+paddingW_*2-kernel_size_)%stride_ == 0);
+//		assert((in_h_+paddingH_*2-kernel_size_)%stride_ == 0);
 
+		allocPout(minibatch,in_channels_,(in_h_+paddingH_*2-kernel_size_)/stride_+1,(in_w_+paddingW_*2-kernel_size_)/stride_+1);
 		//all layer follow this pattern
 		// 1 set the source tensor
 		// 2 set the operator tensor
@@ -302,8 +310,8 @@ class ConvBiasLayer: public baseModule
 		{
 				printf("ConvBiasLayer gpuid %d minibatch %d in_channels_ %d in_h_ %d in_w_ %d numFilter_ %d kernel_size_ %d stride_ %d paddingH_ %d paddingW_ %d out_height %d out_width %d\n",
 						                      gpuid ,  minibatch ,  in_channels_ ,  in_h_ ,  in_w_ ,  numFilter_ ,  kernel_size_ ,  stride_ ,  paddingH_ ,  paddingW_ , (in_h_+paddingH_*2-kernel_size_)/stride_+1, (in_w_+paddingW_*2-kernel_size_)/stride_+1);
-				assert((in_w_+paddingW_*2-kernel_size_)%stride_ == 0);
-				assert((in_h_+paddingH_*2-kernel_size_)%stride_ == 0);
+				//assert((in_w_+paddingW_*2-kernel_size_)%stride_ == 0);
+				//assert((in_h_+paddingH_*2-kernel_size_)%stride_ == 0);
 
 				kernel_size = kernel_size_;
 				assert(kernel_size<16); //this is not strict, just to prevent unreasonable large kernel
@@ -354,6 +362,8 @@ class ConvBiasLayer: public baseModule
 				cout<<"out_channels "<<out_channels<<endl;
 				cout<<"out_height "<<out_height<<endl;
 				cout<<"out_width "<<out_width<<endl;
+
+				allocPout(n,c,h,w);
 
     		checkCUDNN (cudnnCreateTensorDescriptor (&dstTensorDesc));
     		checkCUDNN (cudnnSetTensor4dDescriptor (dstTensorDesc,
@@ -443,7 +453,7 @@ class TrainingContext
 
     // Create CUBLAS and CUDNN handles
     checkCudaErrors (cudaSetDevice (gpuid));
-    checkCudaErrors (cublasCreate (&cublasHandle));
+    /*checkCudaErrors (*/cublasCreate (&cublasHandle)/*)*/;
     checkCUDNN (cudnnCreate (&cudnnHandle));
 
     // Create tensor descriptors
@@ -463,6 +473,10 @@ class TrainingContext
 			return vmod[currentlayer];
 	}
 
+	baseModule * getLastLayer() {
+		return vmod[vmod.size()-1];
+	}
+
 	void reset() {
 					currentlayer=0;
 	}
@@ -476,7 +490,7 @@ class TrainingContext
 		size_t maxsize=0;
 		for(int i=0;i<vmod.size();i++) {
 			maxsize = max(maxsize,vmod[i]->m_workspaceSizeByte);
-			cout<<"maxsize "<<vmod[i]->m_workspaceSizeByte <<endl;
+//			cout<<"maxsize "<<vmod[i]->m_workspaceSizeByte <<endl;
 		}
 		//alloc new size
 		if(maxsize>0) {
@@ -499,7 +513,7 @@ class TrainingContext
     checkCudaErrors (cudaSetDevice (m_gpuid));
 
     checkCUDNN (cudnnDestroyTensorDescriptor (dataTensor));
-    checkCudaErrors (cublasDestroy (cublasHandle));
+    /*checkCudaErrors (*/cublasDestroy (cublasHandle)/*)*/;
     checkCUDNN (cudnnDestroy (cudnnHandle));
   }
 
@@ -647,7 +661,7 @@ void construct_Resnet(struct runingConfig * prc ){
 			//the context for this gpu
       TrainingContext * pcontext = new TrainingContext (gpuid, minib);
 
-      class ConvBiasLayer * pconv1=new ConvBiasLayer (
+      class ConvBiasLayer * pconv11=new ConvBiasLayer (
 											"conv1",
 											pcontext->cudnnHandle,
 											pcontext->cublasHandle,
@@ -655,38 +669,197 @@ void construct_Resnet(struct runingConfig * prc ){
 											minib,
 											chnl,
 											height,width, 
-											64,1,1,
-											0,0,
+											64,7,2, //output filters number, kernel size,stride
+											0,0,//padding
 											pdata
 											);
-			class ConvBiasLayer * pconv2=new ConvBiasLayer (
-											"conv2",
+			pcontext -> addMod(pconv11);
+			class MaxPoolLayer * ppool1=new MaxPoolLayer (
+											"conv2_pool",
 											pcontext->cudnnHandle,
 											pcontext->cublasHandle,
 											gpuid,
 											minib,
-											pconv1->out_channels,
-											pconv1->out_height, pconv1->out_width,
+											pcontext->getLastLayer()->out_channels,
+											pcontext->getLastLayer()->out_height, pcontext->getLastLayer()->out_width,
+											3,2,//kernel size, stride
+											0,0,//padding
+											pcontext->getLastLayer()->pout
+											);
+			pcontext -> addMod(ppool1);
+			//conv2
+			for(int i =0;i<3;i++) {
+	      class ConvBiasLayer * pconv1=new ConvBiasLayer (
+											"conv2_"+to_string(i)+"_1",
+											pcontext->cudnnHandle,
+											pcontext->cublasHandle,
+											gpuid,
+											minib,
+											pcontext->getLastLayer()->out_channels,
+											pcontext->getLastLayer()->out_height, pcontext->getLastLayer()->out_width,
+											64,1,1, //output filters number, kernel size,stride
+											0,0,//padding
+											pcontext->getLastLayer()->pout
+											);
+				pcontext -> addMod(pconv1);
+
+				class ConvBiasLayer * pconv2=new ConvBiasLayer (
+											"conv2_"+to_string(i)+"_2",
+											pcontext->cudnnHandle,
+											pcontext->cublasHandle,
+											gpuid,
+											minib,
+											pcontext->getLastLayer()->out_channels,
+											pcontext->getLastLayer()->out_height, pcontext->getLastLayer()->out_width,
 											64,3,1,
 											1,1,
-											pconv1->pout
+											pcontext->getLastLayer()->pout
 											);
-			class ConvBiasLayer * pconv3=new ConvBiasLayer (
-											"conv3",
+				pcontext -> addMod(pconv2);
+	      class ConvBiasLayer * pconv3=new ConvBiasLayer (
+											"conv2_"+to_string(i)+"_3",
 											pcontext->cudnnHandle,
 											pcontext->cublasHandle,
 											gpuid,
 											minib,
-											pconv2->out_channels,
-											pconv2->out_height, pconv2->out_width,
-											256,1,1,
-											0,0,
-											pconv2->pout
+											pcontext->getLastLayer()->out_channels,
+											pcontext->getLastLayer()->out_height, pcontext->getLastLayer()->out_width,
+											256,1,1, //output filters number, kernel size,stride
+											0,0,//padding
+											pcontext->getLastLayer()->pout
 											);
+				pcontext -> addMod(pconv3);
+			}
+			//conv3
+			for(int i =0;i<4;i++) {
+	      class ConvBiasLayer * pconv1=new ConvBiasLayer (
+											"conv3_"+to_string(i)+"_1",
+											pcontext->cudnnHandle,
+											pcontext->cublasHandle,
+											gpuid,
+											minib,
+											pcontext->getLastLayer()->out_channels,
+											pcontext->getLastLayer()->out_height, pcontext->getLastLayer()->out_width,
+											128,1,(i==0)?2:1, //output filters number, kernel size,stride
+											0,0,//padding
+											pcontext->getLastLayer()->pout
+											);
+				pcontext -> addMod(pconv1);
 
-			pcontext -> addMod(pconv1);
-			pcontext -> addMod(pconv2);
-			pcontext -> addMod(pconv3);
+				class ConvBiasLayer * pconv2=new ConvBiasLayer (
+											"conv3_"+to_string(i)+"_2",
+											pcontext->cudnnHandle,
+											pcontext->cublasHandle,
+											gpuid,
+											minib,
+											pcontext->getLastLayer()->out_channels,
+											pcontext->getLastLayer()->out_height, pcontext->getLastLayer()->out_width,
+											128,3,1,
+											1,1,
+											pcontext->getLastLayer()->pout
+											);
+				pcontext -> addMod(pconv2);
+	      class ConvBiasLayer * pconv3=new ConvBiasLayer (
+											"conv3_"+to_string(i)+"_3",
+											pcontext->cudnnHandle,
+											pcontext->cublasHandle,
+											gpuid,
+											minib,
+											pcontext->getLastLayer()->out_channels,
+											pcontext->getLastLayer()->out_height, pcontext->getLastLayer()->out_width,
+											512,1,1, //output filters number, kernel size,stride
+											0,0,//padding
+											pcontext->getLastLayer()->pout
+											);
+				pcontext -> addMod(pconv3);
+			}
+			//conv4
+			for(int i =0;i<23;i++) {
+	      class ConvBiasLayer * pconv1=new ConvBiasLayer (
+											"conv4_"+to_string(i)+"_1",
+											pcontext->cudnnHandle,
+											pcontext->cublasHandle,
+											gpuid,
+											minib,
+											pcontext->getLastLayer()->out_channels,
+											pcontext->getLastLayer()->out_height, pcontext->getLastLayer()->out_width,
+											256,1,(i==0)?2:1, //output filters number, kernel size,stride
+											0,0,//padding
+											pcontext->getLastLayer()->pout
+											);
+				pcontext -> addMod(pconv1);
+
+				class ConvBiasLayer * pconv2=new ConvBiasLayer (
+											"conv4_"+to_string(i)+"_2",
+											pcontext->cudnnHandle,
+											pcontext->cublasHandle,
+											gpuid,
+											minib,
+											pcontext->getLastLayer()->out_channels,
+											pcontext->getLastLayer()->out_height, pcontext->getLastLayer()->out_width,
+											256,3,1,
+											1,1,
+											pcontext->getLastLayer()->pout
+											);
+				pcontext -> addMod(pconv2);
+	      class ConvBiasLayer * pconv3=new ConvBiasLayer (
+											"conv4_"+to_string(i)+"_3",
+											pcontext->cudnnHandle,
+											pcontext->cublasHandle,
+											gpuid,
+											minib,
+											pcontext->getLastLayer()->out_channels,
+											pcontext->getLastLayer()->out_height, pcontext->getLastLayer()->out_width,
+											1024,1,1, //output filters number, kernel size,stride
+											0,0,//padding
+											pcontext->getLastLayer()->pout
+											);
+				pcontext -> addMod(pconv3);
+			}
+			//conv5
+			for(int i =0;i<3;i++) {
+	      class ConvBiasLayer * pconv1=new ConvBiasLayer (
+											"conv5_"+to_string(i)+"_1",
+											pcontext->cudnnHandle,
+											pcontext->cublasHandle,
+											gpuid,
+											minib,
+											pcontext->getLastLayer()->out_channels,
+											pcontext->getLastLayer()->out_height, pcontext->getLastLayer()->out_width,
+											512,1,(i==0)?2:1, //output filters number, kernel size,stride
+											0,0,//padding
+											pcontext->getLastLayer()->pout
+											);
+				pcontext -> addMod(pconv1);
+
+				class ConvBiasLayer * pconv2=new ConvBiasLayer (
+											"conv5_"+to_string(i)+"_2",
+											pcontext->cudnnHandle,
+											pcontext->cublasHandle,
+											gpuid,
+											minib,
+											pcontext->getLastLayer()->out_channels,
+											pcontext->getLastLayer()->out_height, pcontext->getLastLayer()->out_width,
+											512,3,1,
+											1,1,
+											pcontext->getLastLayer()->pout
+											);
+				pcontext -> addMod(pconv2);
+	      class ConvBiasLayer * pconv3=new ConvBiasLayer (
+											"conv5_"+to_string(i)+"_3",
+											pcontext->cudnnHandle,
+											pcontext->cublasHandle,
+											gpuid,
+											minib,
+											pcontext->getLastLayer()->out_channels,
+											pcontext->getLastLayer()->out_height, pcontext->getLastLayer()->out_width,
+											2048,1,1, //output filters number, kernel size,stride
+											0,0,//padding
+											pcontext->getLastLayer()->pout
+											);
+				pcontext -> addMod(pconv3);
+			}
+
 			pcontext -> finishAddMod();
 
       pcontextV->push_back (pcontext);
@@ -696,6 +869,14 @@ void construct_Resnet(struct runingConfig * prc ){
 	for (int gpuid = 0; gpuid < num_gpus; gpuid++) {
 					(*pcontextV)[gpuid]-> print();
 	}
+}
+
+void syncAllGPU(int num_gpus) {
+  for (int gpuid = 0; gpuid < num_gpus; gpuid++)
+  {
+    checkCudaErrors (cudaSetDevice (gpuid));
+    checkCudaErrors (cudaDeviceSynchronize ());
+  }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -762,8 +943,7 @@ main (int argc, char **argv)
 		construct_Lenet(&rc);
 	}
 
-  checkCudaErrors (cudaDeviceSynchronize ());
-
+	syncAllGPU(num_gpus);
   // Use SGD to train the network
 	size_t totalsize=0;
   auto t1 = chrono::high_resolution_clock::now ();
@@ -784,7 +964,9 @@ main (int argc, char **argv)
 				assert(contextV[gpuid]->currentlayer >0);
 			}
 			if(contextV[0]->isFinished()) break;
-			
+
+			syncAllGPU(num_gpus);	
+
 		  if (copy)
 			{
 			  for (int gpuid = 0; gpuid < num_gpus; gpuid++)
@@ -809,19 +991,16 @@ main (int argc, char **argv)
 						}
 			  }
 		
-			  for (int gpuid = 0; gpuid < num_gpus; gpuid++)
-			    {
-			      checkCudaErrors (cudaSetDevice (gpuid));
-			      checkCudaErrors (cudaDeviceSynchronize ());
-			    }
+				syncAllGPU(num_gpus);
 			}
 		}
   }				// end of iteration
-
-  checkCudaErrors (cudaDeviceSynchronize ());
+	syncAllGPU(num_gpus);
   auto t2 = chrono::high_resolution_clock::now ();
 
-  cout<<"Iteration time: width "<<width
+  cout<<"Iteration time: "
+			<<" batch_size "<< minib
+			<<" width "<<width
 			<<" fract "<< (copy?fract:0.0)
 			<<" totalsize "<< totalsize/iterations
 			<<" time " << chrono::duration_cast < chrono::microseconds > (t2 - t1).count () / 1000.0f / iterations

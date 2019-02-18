@@ -1,0 +1,6 @@
+OK	1 add lenet 
+OK 1.1 compute the size of data trasfered in each iteration
+2 add deeper layer
+3 add fc and so on
+4 number of gpu, or even manually use particular gpu for higher bandwidth
+

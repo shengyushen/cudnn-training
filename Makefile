@@ -8,7 +8,7 @@ LDFLAG = -lcudnn -lcublas
 all : $(EXE)
 
 $(EXE) : $(SRC)
-		$(CC) $(LDFLAG) -arch $(ARCH) $^ -o $@
+		$(CC) --std c++11 $(LDFLAG) -arch $(ARCH) $^ -o $@
 
 clean:
 	rm -f *.o *.exe
