@@ -72,13 +72,18 @@ using namespace std;
 //seems to be a class like struct
 class baseModule{
 	public : 
+	float alpha;
+	float beta;
+
 	string name;
   int in_channels, out_channels ;
   int in_width, in_height, out_width, out_height;
 
 	float * pin; // this is pass in from outside
+	float * pinDiff;
 	long inbuf_size;
 	float * pout; // pout should be alloc by child class
+	float * poutDiff;
 	long outbuf_size;
 
 	int minibatch;
@@ -108,6 +113,8 @@ class baseModule{
 					cout<<"gpuid "<<gpuid<<endl;
 	}
 	baseModule(
+									float alpha_,
+									float beta_,
 									string name_,
   								cudnnHandle_t cudnnHandle_,
 								  cublasHandle_t cublasHandle_,
@@ -122,6 +129,8 @@ class baseModule{
 									float * pin_
 									) 
 	{
+		alpha=alpha_;
+		beta=beta_;
 		name=name_;
 		cudnnHandle = cudnnHandle_;
 		cublasHandle = cublasHandle_;
@@ -151,21 +160,33 @@ class baseModule{
 	}
 
 	void allocPout(int minibatch_,int out_c_,int out_h_,int out_w_) {
-		minibatch = minibatch_;
-		out_channels = out_c_;
-		out_width = out_w_;
-		out_height = out_h_;
+//		minibatch = minibatch_;
+//		out_channels = out_c_;
+//		out_width = out_w_;
+//		out_height = out_h_;
+					assert(minibatch_==minibatch);
+					assert(out_channels==out_c_);
+					assert(out_width==out_w_);
+					assert(out_height==out_h_);
 		outbuf_size = minibatch_*out_c_*out_w_*out_h_;
 		checkCudaErrors(cudaSetDevice(gpuid));
     checkCudaErrors (cudaMallocManaged (&pout, sizeof (float) *outbuf_size ));
     checkCudaErrors (cudaMemAdvise (pout,sizeof(float)* outbuf_size ,cudaMemAdviseSetPreferredLocation,gpuid));
 	}
 
-	virtual void run1step() {};
+	void allocPinDiff() {
+		checkCudaErrors(cudaSetDevice(gpuid));
+    checkCudaErrors (cudaMallocManaged (&pinDiff, sizeof (float) *inbuf_size));
+    checkCudaErrors (cudaMemAdvise (pinDiff,sizeof(float)* inbuf_size ,cudaMemAdviseSetPreferredLocation,gpuid));
+	}
+
+	virtual void fw1step() {};
+	virtual void bw1step() {};
 
 	~baseModule  () {
 			checkCudaErrors(cudaSetDevice(gpuid));
 			cudaFree(pout);
+			cudaFree(pinDiff);
 	}
 	size_t getOutputFloatNumber() {
 					return outbuf_size;
@@ -183,6 +204,8 @@ class MaxPoolLayer: public baseModule {
   cudnnPoolingDescriptor_t poolDesc;
 	cudnnTensorDescriptor_t  dstTensorDesc; //this out already have pout in baseModule
 	MaxPoolLayer(
+			float alpha_,
+			float beta_,
 			string name_,
 			cudnnHandle_t cudnnHandle_,
 			cublasHandle_t cublasHandle_,
@@ -193,6 +216,8 @@ class MaxPoolLayer: public baseModule {
 			int kernel_size_, int stride_, //it seems pooling just remain the same number of channel as input
 			int paddingH_, int paddingW_,float * pin_) 
 					: baseModule(
+									alpha_,
+									beta_,
 									name_,
 									cudnnHandle_,
 									cublasHandle_,
@@ -217,6 +242,7 @@ class MaxPoolLayer: public baseModule {
 //		assert((in_h_+paddingH_*2-kernel_size_)%stride_ == 0);
 
 		allocPout(minibatch,in_channels_,(in_h_+paddingH_*2-kernel_size_)/stride_+1,(in_w_+paddingW_*2-kernel_size_)/stride_+1);
+		allocPinDiff();
 		//all layer follow this pattern
 		// 1 set the source tensor
 		// 2 set the operator tensor
@@ -252,15 +278,21 @@ class MaxPoolLayer: public baseModule {
 		m_workspaceSizeByte =0;
 
 	}
-	void run1step () {
+	void fw1step () {
 				//pooling layer dont need workspace
 				//assert(p_workspace!=NULL);
 				//assert(m_workspaceSizeByte!=0);
         checkCudaErrors(cudaSetDevice(gpuid));
-        float alpha = 1.0f, beta = 0.0f;
         checkCUDNN(cudnnPoolingForward(cudnnHandle, poolDesc, &alpha, srcTensorDesc,
                                        pin, &beta, dstTensorDesc,pout));
 
+	}
+	void bw1step() {
+					// pooling layer have no weight
+    checkCudaErrors(cudaSetDevice(gpuid));
+		checkCUDNN(cudnnPoolingBackward(cudnnHandle, poolDesc, &alpha, 
+                                        dstTensorDesc, pout,dstTensorDesc, poutDiff,
+                                        srcTensorDesc, pin, &beta, srcTensorDesc, pinDiff));
 	}
 	~MaxPoolLayer() {
 		checkCUDNN (cudnnDestroyTensorDescriptor(srcTensorDesc));
@@ -273,16 +305,28 @@ class ConvBiasLayer: public baseModule
 {
 		public :
 		int kernel_size,stride;
+
 		cudnnTensorDescriptor_t biasTensor;
 		float * pconvbias;
+		float * pconvbiasGradient;
+
 		cudnnTensorDescriptor_t srcTensorDesc;
+
 		cudnnFilterDescriptor_t filterDesc;
 		float * pconvWeigth;
+		float * pconvWeigthGradient;
+
 		cudnnConvolutionDescriptor_t convDesc;
+
 		cudnnTensorDescriptor_t  dstTensorDesc; //this out already have pout in baseModule
-		cudnnConvolutionFwdAlgo_t algo;
+
+		cudnnConvolutionFwdAlgo_t fwalgo;
+		cudnnConvolutionBwdFilterAlgo_t bwfalgo;
+		cudnnConvolutionBwdDataAlgo_t bwdalgo;
 
     ConvBiasLayer (
+				float alpha_,
+				float beta_,
 				string name_,
 				cudnnHandle_t cudnnHandle_,
 			  cublasHandle_t cublasHandle_,
@@ -294,6 +338,8 @@ class ConvBiasLayer: public baseModule
 				int paddingH_, int paddingW_,
 				float * pin_)  // pin pass from outside
 						: baseModule(
+									alpha_,
+									beta_,
 									name_,
 									cudnnHandle_,
 									cublasHandle_,
@@ -322,6 +368,7 @@ class ConvBiasLayer: public baseModule
 				checkCUDNN (cudnnCreateTensorDescriptor (&biasTensor));
     		checkCUDNN (cudnnSetTensor4dDescriptor (biasTensor, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, 1, out_channels, 1, 1));
     		checkCudaErrors(cudaMallocManaged(&pconvbias, sizeof(float) * out_channels ));
+    		checkCudaErrors(cudaMallocManaged(&pconvbiasGradient, sizeof(float) * out_channels ));
 
 				//set the source tensor
     		checkCUDNN (cudnnCreateTensorDescriptor (&srcTensorDesc));
@@ -340,6 +387,7 @@ class ConvBiasLayer: public baseModule
 					    kernel_size,
 					    kernel_size));
 				checkCudaErrors(cudaMallocManaged(&pconvWeigth,sizeof(float)*in_channels_*kernel_size_*kernel_size_*numFilter_));
+				checkCudaErrors(cudaMallocManaged(&pconvWeigthGradient,sizeof(float)*in_channels_*kernel_size_*kernel_size_*numFilter_));
 
     		checkCUDNN (cudnnCreateConvolutionDescriptor (&convDesc));
     		checkCUDNN (cudnnSetConvolution2dDescriptor (convDesc,
@@ -364,6 +412,7 @@ class ConvBiasLayer: public baseModule
 				cout<<"out_width "<<out_width<<endl;
 
 				allocPout(n,c,h,w);
+				allocPinDiff();
 
     		checkCUDNN (cudnnCreateTensorDescriptor (&dstTensorDesc));
     		checkCUDNN (cudnnSetTensor4dDescriptor (dstTensorDesc,
@@ -375,19 +424,44 @@ class ConvBiasLayer: public baseModule
 						     convDesc,
 						     dstTensorDesc,
 						     CUDNN_CONVOLUTION_FWD_PREFER_FASTEST,
-						     0, &algo));
+						     0, &fwalgo));
 
 		    checkCUDNN (cudnnGetConvolutionForwardWorkspaceSize (cudnnHandle,
 							 srcTensorDesc,
 							 filterDesc,
 							 convDesc,
 							 dstTensorDesc,
-							 algo, &m_workspaceSizeByte));
+							 fwalgo, &m_workspaceSizeByte));
 				//assert(m_workspaceSizeByte >0);
 
 				bNeedSyncInTensor = kernel_size_ >1; // bigger than 1 need to consider data from neighbour
+
+				//handling backward algo
+        // If backprop filter algorithm was requested
+				size_t tmpsize=0;
+        checkCUDNN(cudnnGetConvolutionBackwardFilterAlgorithm(
+            cudnnHandle, srcTensorDesc, dstTensorDesc, convDesc, filterDesc,
+            CUDNN_CONVOLUTION_BWD_FILTER_PREFER_FASTEST, 0, &bwfalgo));
+
+        checkCUDNN(cudnnGetConvolutionBackwardFilterWorkspaceSize(
+            cudnnHandle, srcTensorDesc, dstTensorDesc, convDesc, filterDesc, 
+            bwfalgo, &tmpsize));
+
+        m_workspaceSizeByte = std::max(m_workspaceSizeByte, tmpsize);
+
+        // If backprop data algorithm was requested
+        checkCUDNN(cudnnGetConvolutionBackwardDataAlgorithm(
+            cudnnHandle, filterDesc, dstTensorDesc, convDesc, srcTensorDesc,
+            CUDNN_CONVOLUTION_BWD_DATA_PREFER_FASTEST, 0, &bwdalgo));
+
+        checkCUDNN(cudnnGetConvolutionBackwardDataWorkspaceSize(
+            cudnnHandle, filterDesc, dstTensorDesc, convDesc, srcTensorDesc, 
+            bwdalgo, &tmpsize));
+
+        m_workspaceSizeByte = std::max(m_workspaceSizeByte, tmpsize);
+        
 		}
-	void run1step () {
+	void fw1step () {
 					//this may not be neccessary
 //				if(p_workspace==NULL) 
 //					cout<<"WARNING : gpuid "<< gpuid<<" p_workspace is empty"<<endl;
@@ -400,17 +474,37 @@ class ConvBiasLayer: public baseModule
 																					srcTensorDesc, pin, 
 																					filterDesc, pconvWeigth, 
 																					convDesc, 
-                                           algo, p_workspace, m_workspaceSizeByte, &beta,
+                                           fwalgo, p_workspace, m_workspaceSizeByte, &beta,
                                            dstTensorDesc, pout));
         checkCUDNN(cudnnAddTensor(cudnnHandle, &alpha, biasTensor,
                                   pconvbias, &alpha, dstTensorDesc, pout));
 
+	}
+
+	void bw1step () {
+        checkCUDNN(cudnnConvolutionBackwardBias(cudnnHandle, &alpha, dstTensorDesc,
+                                                poutDiff, &beta, biasTensor, pconvbias));
+
+        
+        checkCUDNN(cudnnConvolutionBackwardFilter(cudnnHandle, &alpha, srcTensorDesc,
+                                                  pin, dstTensorDesc, poutDiff, convDesc,
+                                                  bwfalgo, p_workspace, m_workspaceSizeByte,
+                                                  &beta, filterDesc, pconvWeigthGradient));
+    
+        checkCUDNN(cudnnConvolutionBackwardData(cudnnHandle, &alpha, filterDesc,
+                                                pconvWeigth, dstTensorDesc, poutDiff, convDesc, 
+                                                bwdalgo, p_workspace, m_workspaceSizeByte,
+                                                &beta, srcTensorDesc, pinDiff));
+			
 	}
 	~ConvBiasLayer() {
 		checkCUDNN (cudnnDestroyTensorDescriptor(biasTensor));
 		checkCUDNN (cudnnDestroyTensorDescriptor(srcTensorDesc));
 		checkCUDNN (cudnnDestroyFilterDescriptor(filterDesc));
 		checkCudaErrors(cudaFree(pconvWeigth));
+		checkCudaErrors(cudaFree(pconvWeigthGradient));
+		checkCudaErrors(cudaFree(pconvbias));
+		checkCudaErrors(cudaFree(pconvbiasGradient));
 		checkCUDNN (cudnnDestroyConvolutionDescriptor(convDesc));
     checkCUDNN (cudnnDestroyTensorDescriptor (dstTensorDesc));
 	}
@@ -424,7 +518,7 @@ class ConvBiasLayer: public baseModule
 class TrainingContext
 {
 	public :
-
+	float alpha,beta; 
   cudnnHandle_t cudnnHandle;
   cublasHandle_t cublasHandle;
   int m_gpuid;
@@ -444,12 +538,14 @@ class TrainingContext
 					}
 	}
 
-  TrainingContext (int gpuid, int batch_size)
+  TrainingContext (int gpuid, int batch_size,float alpha_,float beta_)
   {
     m_batchSize = batch_size;
 		m_gpuid =gpuid;
     printf ("gpuid %d batch_size %d\n", gpuid,batch_size);
 		currentlayer=0;
+		alpha=alpha_;
+		beta=beta_;
 
     // Create CUBLAS and CUDNN handles
     checkCudaErrors (cudaSetDevice (gpuid));
@@ -481,8 +577,12 @@ class TrainingContext
 					currentlayer=0;
 	}
 
-	bool isFinished() {
+	bool isForwardFinished() {
 		 if(currentlayer>=vmod.size()) return true;
+		 else return false;
+	}
+	bool isBackwardFinished() {
+		 if(currentlayer==0) return true;
 		 else return false;
 	}
 
@@ -526,12 +626,25 @@ class TrainingContext
         checkCudaErrors(cudaSetDevice(m_gpuid));
 
         // Conv1 layer
-				vmod[currentlayer]->run1step();
+				vmod[currentlayer]->fw1step();
 				
 				currentlayer++;
 		 }
 	 }
-};
+	 void BackwardPropagation() {
+		currentlayer--;
+		 if(currentlayer<0) {
+ 		  cout<<"finished at layer "<<currentlayer<<endl;
+			assert(0);
+		 } else {
+				cout<<"layer "<<currentlayer<<endl;
+        checkCudaErrors(cudaSetDevice(m_gpuid));
+
+        // Conv1 layer
+				vmod[currentlayer]->bw1step();
+		 }
+	 }
+};//end of TrainingContext
 
 __global__ void
 ssyinitfloat (float *p, size_t n)
@@ -557,6 +670,7 @@ struct runingConfig {
 };
 
 void construct_Lenet(struct runingConfig * prc ){
+  float alpha = 1.0f, beta = 0.0f;
 	size_t width = prc->width;
 	size_t height = prc->height;
 //	int iterations = prc->iterations;
@@ -575,9 +689,11 @@ void construct_Lenet(struct runingConfig * prc ){
 			size_t input_sz = minib*chnl*width*height;
 			checkCudaErrors(cudaMallocManaged(&pdata,sizeof(float)*input_sz));
 			//the context for this gpu
-      TrainingContext * pcontext = new TrainingContext (gpuid, minib);
+      TrainingContext * pcontext = new TrainingContext (gpuid, minib,alpha,beta);
 
       class ConvBiasLayer * pconv1=new ConvBiasLayer (
+											alpha,
+											beta,
 											"conv1",
 											pcontext->cudnnHandle,
 											pcontext->cublasHandle,
@@ -590,6 +706,8 @@ void construct_Lenet(struct runingConfig * prc ){
 											pdata
 											);
 			class MaxPoolLayer * ppool1=new MaxPoolLayer (
+											alpha,
+											beta,
 											"pool1",
 											pcontext->cudnnHandle,
 											pcontext->cublasHandle,
@@ -602,6 +720,8 @@ void construct_Lenet(struct runingConfig * prc ){
 											pconv1->pout
 											);
 			class ConvBiasLayer * pconv2=new ConvBiasLayer (
+											alpha,
+											beta,
 											"conv2",
 											pcontext->cudnnHandle,
 											pcontext->cublasHandle,
@@ -614,6 +734,8 @@ void construct_Lenet(struct runingConfig * prc ){
 											ppool1->pout
 											);
 			class MaxPoolLayer * ppool2=new MaxPoolLayer (
+											alpha,
+											beta,
 											"pool2",
 											pcontext->cudnnHandle,
 											pcontext->cublasHandle,
@@ -641,6 +763,7 @@ void construct_Lenet(struct runingConfig * prc ){
 	}
 }
 void construct_Resnet(struct runingConfig * prc ){
+  float alpha = 1.0f, beta = 0.0f;
 	size_t width = prc->width;
 	size_t height = prc->height;
 //	int iterations = prc->iterations;
@@ -659,9 +782,11 @@ void construct_Resnet(struct runingConfig * prc ){
 			size_t input_sz = minib*chnl*width*height;
 			checkCudaErrors(cudaMallocManaged(&pdata,sizeof(float)*input_sz));
 			//the context for this gpu
-      TrainingContext * pcontext = new TrainingContext (gpuid, minib);
+      TrainingContext * pcontext = new TrainingContext (gpuid, minib,alpha,beta);
 
       class ConvBiasLayer * pconv11=new ConvBiasLayer (
+											alpha,
+											beta,
 											"conv1",
 											pcontext->cudnnHandle,
 											pcontext->cublasHandle,
@@ -675,6 +800,8 @@ void construct_Resnet(struct runingConfig * prc ){
 											);
 			pcontext -> addMod(pconv11);
 			class MaxPoolLayer * ppool1=new MaxPoolLayer (
+											alpha,
+											beta,
 											"conv2_pool",
 											pcontext->cudnnHandle,
 											pcontext->cublasHandle,
@@ -690,6 +817,8 @@ void construct_Resnet(struct runingConfig * prc ){
 			//conv2
 			for(int i =0;i<3;i++) {
 	      class ConvBiasLayer * pconv1=new ConvBiasLayer (
+											alpha,
+											beta,
 											"conv2_"+to_string(i)+"_1",
 											pcontext->cudnnHandle,
 											pcontext->cublasHandle,
@@ -704,6 +833,8 @@ void construct_Resnet(struct runingConfig * prc ){
 				pcontext -> addMod(pconv1);
 
 				class ConvBiasLayer * pconv2=new ConvBiasLayer (
+											alpha,
+											beta,
 											"conv2_"+to_string(i)+"_2",
 											pcontext->cudnnHandle,
 											pcontext->cublasHandle,
@@ -717,6 +848,8 @@ void construct_Resnet(struct runingConfig * prc ){
 											);
 				pcontext -> addMod(pconv2);
 	      class ConvBiasLayer * pconv3=new ConvBiasLayer (
+											alpha,
+											beta,
 											"conv2_"+to_string(i)+"_3",
 											pcontext->cudnnHandle,
 											pcontext->cublasHandle,
@@ -733,6 +866,8 @@ void construct_Resnet(struct runingConfig * prc ){
 			//conv3
 			for(int i =0;i<4;i++) {
 	      class ConvBiasLayer * pconv1=new ConvBiasLayer (
+											alpha,
+											beta,
 											"conv3_"+to_string(i)+"_1",
 											pcontext->cudnnHandle,
 											pcontext->cublasHandle,
@@ -747,6 +882,8 @@ void construct_Resnet(struct runingConfig * prc ){
 				pcontext -> addMod(pconv1);
 
 				class ConvBiasLayer * pconv2=new ConvBiasLayer (
+											alpha,
+											beta,
 											"conv3_"+to_string(i)+"_2",
 											pcontext->cudnnHandle,
 											pcontext->cublasHandle,
@@ -760,6 +897,8 @@ void construct_Resnet(struct runingConfig * prc ){
 											);
 				pcontext -> addMod(pconv2);
 	      class ConvBiasLayer * pconv3=new ConvBiasLayer (
+											alpha,
+											beta,
 											"conv3_"+to_string(i)+"_3",
 											pcontext->cudnnHandle,
 											pcontext->cublasHandle,
@@ -776,6 +915,8 @@ void construct_Resnet(struct runingConfig * prc ){
 			//conv4
 			for(int i =0;i<23;i++) {
 	      class ConvBiasLayer * pconv1=new ConvBiasLayer (
+											alpha,
+											beta,
 											"conv4_"+to_string(i)+"_1",
 											pcontext->cudnnHandle,
 											pcontext->cublasHandle,
@@ -790,6 +931,8 @@ void construct_Resnet(struct runingConfig * prc ){
 				pcontext -> addMod(pconv1);
 
 				class ConvBiasLayer * pconv2=new ConvBiasLayer (
+											alpha,
+											beta,
 											"conv4_"+to_string(i)+"_2",
 											pcontext->cudnnHandle,
 											pcontext->cublasHandle,
@@ -803,6 +946,8 @@ void construct_Resnet(struct runingConfig * prc ){
 											);
 				pcontext -> addMod(pconv2);
 	      class ConvBiasLayer * pconv3=new ConvBiasLayer (
+											alpha,
+											beta,
 											"conv4_"+to_string(i)+"_3",
 											pcontext->cudnnHandle,
 											pcontext->cublasHandle,
@@ -819,6 +964,8 @@ void construct_Resnet(struct runingConfig * prc ){
 			//conv5
 			for(int i =0;i<3;i++) {
 	      class ConvBiasLayer * pconv1=new ConvBiasLayer (
+											alpha,
+											beta,
 											"conv5_"+to_string(i)+"_1",
 											pcontext->cudnnHandle,
 											pcontext->cublasHandle,
@@ -833,6 +980,8 @@ void construct_Resnet(struct runingConfig * prc ){
 				pcontext -> addMod(pconv1);
 
 				class ConvBiasLayer * pconv2=new ConvBiasLayer (
+											alpha,
+											beta,
 											"conv5_"+to_string(i)+"_2",
 											pcontext->cudnnHandle,
 											pcontext->cublasHandle,
@@ -846,6 +995,8 @@ void construct_Resnet(struct runingConfig * prc ){
 											);
 				pcontext -> addMod(pconv2);
 	      class ConvBiasLayer * pconv3=new ConvBiasLayer (
+											alpha,
+											beta,
 											"conv5_"+to_string(i)+"_3",
 											pcontext->cudnnHandle,
 											pcontext->cublasHandle,
@@ -861,6 +1012,16 @@ void construct_Resnet(struct runingConfig * prc ){
 			}
 
 			pcontext -> finishAddMod();
+
+			//setting the diff buffer pointer
+			int lastl=(pcontext->vmod).size();
+			size_t lastSizeInFloat = (pcontext->vmod)[lastl-1]->getOutputFloatNumber();
+			float * plast;
+    	checkCudaErrors (cudaMallocManaged (&plast, sizeof (float) * lastSizeInFloat));
+			for(int i=(pcontext->vmod).size()-1;i>=0;i--) {
+				(pcontext->vmod)[i]->poutDiff=plast;
+				plast=(pcontext->vmod)[i]->pinDiff;
+			}
 
       pcontextV->push_back (pcontext);
 			pd_dataV->push_back(pdata);
@@ -953,7 +1114,7 @@ main (int argc, char **argv)
 		for(int gpuid=0;gpuid<num_gpus;gpuid++)     {
 						contextV[gpuid]->reset();
 		}
-
+		//forward propage
 		while(true) {
 			//run one layer
 		  for (int gpuid = 0; gpuid < num_gpus; gpuid++)
@@ -963,7 +1124,7 @@ main (int argc, char **argv)
 			  contextV[gpuid]->ForwardPropagation1 ();
 				assert(contextV[gpuid]->currentlayer >0);
 			}
-			if(contextV[0]->isFinished()) break;
+			if(contextV[0]->isForwardFinished()) break;
 
 			syncAllGPU(num_gpus);	
 
@@ -986,6 +1147,47 @@ main (int argc, char **argv)
 							if(gpuid == num_gpus-1)
 								totalsize = totalsize+tobetransfered;
 						  checkCudaErrors (cudaMemcpyAsync (pcurrent->pin + sz / (2 * sizeof (float)), pPrev->pin, tobetransfered, cudaMemcpyDefault));
+						} else {
+							cout <<"No need to sync : gpuid "<<gpuid << "layer "<<pcurrent->name<<endl;
+						}
+			  }
+		
+				syncAllGPU(num_gpus);
+			}
+		}
+		//backward propage
+		while(true) {
+			//run one layer
+		  for (int gpuid = 0; gpuid < num_gpus; gpuid++)
+			{
+				assert(contextV[gpuid]->m_gpuid == gpuid);
+			  checkCudaErrors (cudaSetDevice (gpuid));
+			  contextV[gpuid]->BackwardPropagation();
+				assert(contextV[gpuid]->currentlayer >=0);
+			}
+			if(contextV[0]->isBackwardFinished()) break;
+
+			syncAllGPU(num_gpus);	
+
+		  if (copy)
+			{
+			  for (int gpuid = 0; gpuid < num_gpus; gpuid++)
+			  {
+			      //sync n+1 to n
+			      checkCudaErrors (cudaSetDevice (gpuid));
+						baseModule * pcurrent =contextV[gpuid]->getCurrentLayer();
+			      size_t sz = sizeof (float) * (pcurrent->getOutputFloatNumber() );
+						assert(sz>0);
+						cout<<"sz "<<sz<<endl;
+
+			      if (gpuid > 0 && pcurrent-> bNeedSyncInTensor) {
+							baseModule * pPrev =contextV[gpuid-1]->getCurrentLayer();
+							size_t szPrev = sizeof (float) * (pPrev->getOutputFloatNumber() );
+							assert(sz==szPrev);
+							size_t tobetransfered = int (fract * sz / 2);
+							if(gpuid == num_gpus-1)
+								totalsize = totalsize+tobetransfered;
+						  checkCudaErrors (cudaMemcpyAsync (pcurrent->poutDiff + sz / (2 * sizeof (float)), pPrev->poutDiff, tobetransfered, cudaMemcpyDefault));
 						} else {
 							cout <<"No need to sync : gpuid "<<gpuid << "layer "<<pcurrent->name<<endl;
 						}

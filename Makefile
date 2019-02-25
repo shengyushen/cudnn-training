@@ -3,7 +3,7 @@ ARCH = sm_70
 EXE = cudnnModelParallel.exe
 SRC = cudnnModelParallel.cu
 OBJ = $(SRC:.cu=.o)
-LDFLAG = -lcudnn -lcublas
+LDFLAG = -lcudnn -lcublas -g -G
 
 all : $(EXE)
 

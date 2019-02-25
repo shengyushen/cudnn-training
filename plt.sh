@@ -14,6 +14,9 @@
 grep Ite resnet_huawei_4gpu > ss4
 cat ss4|awk '{if($8==0) {bs=$4;w=$6;frat=$8;time=$12} else if($8==1) {if(bs==$4 && w==$6) {print "bs " $4 " w " $6 " ratio " $12/time " bandwidth " $10*1000/(($12-time)*1024*1024*1024) " GB"}}}'> sss4
 
+grep Ite resnet_huawei_4gpu_nohint > ss4_nohint
+cat ss4_nohint|awk '{if($8==0) {bs=$4;w=$6;frat=$8;time=$12} else if($8==1) {if(bs==$4 && w==$6) {print "bs " $4 " w " $6 " ratio " $12/time " bandwidth " $10*1000/(($12-time)*1024*1024*1024) " GB"}}}'> sss4_nohint
+
 grep Ite resnet_huawei_8gpu > ss8
 cat ss8|awk '{if($8==0) {bs=$4;w=$6;frat=$8;time=$12} else if($8==1) {if(bs==$4 && w==$6) {print "bs " $4 " w " $6 " ratio " $12/time " bandwidth " $10*1000/(($12-time)*1024*1024*1024) " GB"}}}'> sss8
 ./pltrt.plt
