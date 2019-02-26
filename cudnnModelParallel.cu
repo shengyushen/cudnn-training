@@ -1206,6 +1206,7 @@ main (int argc, char **argv)
   auto t2 = chrono::high_resolution_clock::now ();
 
   cout<<"Iteration time: "
+			<<" num_gpus "<< num_gpus
 			<<" batch_size "<< minib
 			<<" width "<<width
 			<<" fract "<< (copy?fract:0.0)
