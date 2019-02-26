@@ -67,7 +67,14 @@ using namespace std;
     }                                                                  \
 } while(0)
 
+bool advise;
 
+void allocAdviseMemory(void** ppout,size_t outbuf_size,int gpuid) {
+	checkCudaErrors(cudaSetDevice(gpuid));
+  checkCudaErrors (cudaMallocManaged (ppout, outbuf_size));
+	if(advise)
+	  checkCudaErrors (cudaMemAdvise (*ppout,outbuf_size ,cudaMemAdviseSetPreferredLocation,gpuid));
+}
 
 //seems to be a class like struct
 class baseModule{
@@ -169,15 +176,11 @@ class baseModule{
 					assert(out_width==out_w_);
 					assert(out_height==out_h_);
 		outbuf_size = minibatch_*out_c_*out_w_*out_h_;
-		checkCudaErrors(cudaSetDevice(gpuid));
-    checkCudaErrors (cudaMallocManaged (&pout, sizeof (float) *outbuf_size ));
-    checkCudaErrors (cudaMemAdvise (pout,sizeof(float)* outbuf_size ,cudaMemAdviseSetPreferredLocation,gpuid));
+		allocAdviseMemory((void**)&pout,sizeof (float) *outbuf_size,gpuid);
 	}
 
 	void allocPinDiff() {
-		checkCudaErrors(cudaSetDevice(gpuid));
-    checkCudaErrors (cudaMallocManaged (&pinDiff, sizeof (float) *inbuf_size));
-    checkCudaErrors (cudaMemAdvise (pinDiff,sizeof(float)* inbuf_size ,cudaMemAdviseSetPreferredLocation,gpuid));
+		allocAdviseMemory((void**)&pinDiff,sizeof (float) *inbuf_size,gpuid);
 	}
 
 	virtual void fw1step() {};
@@ -367,8 +370,8 @@ class ConvBiasLayer: public baseModule
 				//bias descriptor
 				checkCUDNN (cudnnCreateTensorDescriptor (&biasTensor));
     		checkCUDNN (cudnnSetTensor4dDescriptor (biasTensor, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, 1, out_channels, 1, 1));
-    		checkCudaErrors(cudaMallocManaged(&pconvbias, sizeof(float) * out_channels ));
-    		checkCudaErrors(cudaMallocManaged(&pconvbiasGradient, sizeof(float) * out_channels ));
+    		allocAdviseMemory((void**)&pconvbias,         sizeof(float) * out_channels,gpuid );
+    		allocAdviseMemory((void**)&pconvbiasGradient, sizeof(float) * out_channels,gpuid );
 
 				//set the source tensor
     		checkCUDNN (cudnnCreateTensorDescriptor (&srcTensorDesc));
@@ -386,8 +389,8 @@ class ConvBiasLayer: public baseModule
 					    in_channels,
 					    kernel_size,
 					    kernel_size));
-				checkCudaErrors(cudaMallocManaged(&pconvWeigth,sizeof(float)*in_channels_*kernel_size_*kernel_size_*numFilter_));
-				checkCudaErrors(cudaMallocManaged(&pconvWeigthGradient,sizeof(float)*in_channels_*kernel_size_*kernel_size_*numFilter_));
+				allocAdviseMemory((void**)&pconvWeigth,        sizeof(float)*in_channels_*kernel_size_*kernel_size_*numFilter_,gpuid);
+				allocAdviseMemory((void**)&pconvWeigthGradient,sizeof(float)*in_channels_*kernel_size_*kernel_size_*numFilter_,gpuid);
 
     		checkCUDNN (cudnnCreateConvolutionDescriptor (&convDesc));
     		checkCUDNN (cudnnSetConvolution2dDescriptor (convDesc,
@@ -594,7 +597,7 @@ class TrainingContext
 		}
 		//alloc new size
 		if(maxsize>0) {
-			checkCudaErrors(cudaMallocManaged(&pworkspace,maxsize));
+			allocAdviseMemory(&pworkspace,maxsize,m_gpuid);
 		} else {
 						maxsize = 0;
 						pworkspace=NULL;
@@ -1046,8 +1049,8 @@ void syncAllGPU(int num_gpus) {
 int
 main (int argc, char **argv)
 {
-  if (argc != 7) {
-		printf("Usage : cudnnModelParallel.exe <nettype> <iteration> <minbatch> <width>  <copy or not> <fract to copy> ");
+  if (argc != 8) {
+		printf("Usage : cudnnModelParallel.exe <nettype> <iteration> <minbatch> <width>  <copy or not> <fract to copy> <advise or not>");
 		assert(0);
 	}
 
@@ -1074,6 +1077,8 @@ main (int argc, char **argv)
 	checkCudaErrors(cudaSetDevice(0));
 	cudaGetDevice(&deviceId);
 	cout<<"deviceId "<<deviceId<<endl;
+
+	advise= (atoi(argv[7]) >0);
 //	cudaDeviceGetAttribute(&numberOfSMs, cudaDevAttrMultiProcessorCount, deviceId);
 	//printf("numberOfSMs %s\n",numberOfSMs);
 //  int threadsPerBlock = 256;
@@ -1205,6 +1210,7 @@ main (int argc, char **argv)
 			<<" width "<<width
 			<<" fract "<< (copy?fract:0.0)
 			<<" totalsize "<< totalsize/iterations
+			<<" advise "<< (advise?1:0)
 			<<" time " << chrono::duration_cast < chrono::microseconds > (t2 - t1).count () / 1000.0f / iterations
 		<<" ms"<<endl;
   return 0;
