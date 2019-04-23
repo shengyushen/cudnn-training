@@ -1109,6 +1109,8 @@ main (int argc, char **argv)
 		cout<<"lenet"<<endl;
 		construct_Lenet(&rc);
 	}
+    	omp_set_num_threads(num_gpus);  // create as many CPU threads as there are CUDA devices
+        cout<<"num_gpus "<<num_gpus<<endl;
 
 	syncAllGPU(num_gpus);
   // Use SGD to train the network
@@ -1123,13 +1125,13 @@ main (int argc, char **argv)
 		//forward propage
 		while(true) {
 			//run one layer
-    	omp_set_num_threads(num_gpus);  // create as many CPU threads as there are CUDA devices
 		  //for (int gpuid = 0; gpuid < num_gpus; gpuid++)
     	#pragma omp parallel
 			{
         unsigned int cpu_thread_id = omp_get_thread_num();
 				assert(cpu_thread_id < num_gpus);
 				unsigned int gpuid = cpu_thread_id;
+                //cout<<"gpu id "<<gpuid<<endl;
 
 				assert(contextV[gpuid]->m_gpuid == gpuid);
 			  checkCudaErrors (cudaSetDevice (gpuid));

@@ -1,7 +1,7 @@
 CC = nvcc
 ARCH = sm_70
 EXE = cudnnModelParallel.exe memSwap.exe
-LDFLAG = -lgomp -lcudnn -lcublas -g -G
+LDFLAG =  -lcudnn -lcublas -g -G  -Xcompiler -fopenmp
 .SUFFIXES: .cu .exe
 
 all : $(EXE)
