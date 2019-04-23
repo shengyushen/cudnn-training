@@ -236,8 +236,8 @@ class MaxPoolLayer: public baseModule {
 									pin_
 								)
 	{
-				printf("MaxPoolLayer gpuid %d minibatch %d in_channels_ %d in_h_ %d in_w_ %d kernel_size_ %d stride_ %d paddingH_ %d paddingW_ %d\n",
-						                      gpuid_ ,  minibatch_ ,  in_channels_ ,  in_h_ ,  in_w_ ,   kernel_size_ ,  stride_ ,  paddingH_ ,  paddingW_ );
+//				printf("MaxPoolLayer gpuid %d minibatch %d in_channels_ %d in_h_ %d in_w_ %d kernel_size_ %d stride_ %d paddingH_ %d paddingW_ %d\n",
+//						                      gpuid_ ,  minibatch_ ,  in_channels_ ,  in_h_ ,  in_w_ ,   kernel_size_ ,  stride_ ,  paddingH_ ,  paddingW_ );
 		size= kernel_size_;
 		stride = stride_;
 		assert(size > 0);
@@ -358,8 +358,8 @@ class ConvBiasLayer: public baseModule
 									pin_
 								)
 		{
-				printf("ConvBiasLayer gpuid %d minibatch %d in_channels_ %d in_h_ %d in_w_ %d numFilter_ %d kernel_size_ %d stride_ %d paddingH_ %d paddingW_ %d out_height %d out_width %d\n",
-						                      gpuid ,  minibatch ,  in_channels_ ,  in_h_ ,  in_w_ ,  numFilter_ ,  kernel_size_ ,  stride_ ,  paddingH_ ,  paddingW_ , (in_h_+paddingH_*2-kernel_size_)/stride_+1, (in_w_+paddingW_*2-kernel_size_)/stride_+1);
+//				printf("ConvBiasLayer gpuid %d minibatch %d in_channels_ %d in_h_ %d in_w_ %d numFilter_ %d kernel_size_ %d stride_ %d paddingH_ %d paddingW_ %d out_height %d out_width %d\n",
+//						                      gpuid ,  minibatch ,  in_channels_ ,  in_h_ ,  in_w_ ,  numFilter_ ,  kernel_size_ ,  stride_ ,  paddingH_ ,  paddingW_ , (in_h_+paddingH_*2-kernel_size_)/stride_+1, (in_w_+paddingW_*2-kernel_size_)/stride_+1);
 				//assert((in_w_+paddingW_*2-kernel_size_)%stride_ == 0);
 				//assert((in_h_+paddingH_*2-kernel_size_)%stride_ == 0);
 
@@ -410,10 +410,10 @@ class ConvBiasLayer: public baseModule
 				assert(c=out_channels);
 				assert(h==out_height);
 				assert(w==out_width);
-				cout<<"minibatch "<<minibatch<<endl;
-				cout<<"out_channels "<<out_channels<<endl;
-				cout<<"out_height "<<out_height<<endl;
-				cout<<"out_width "<<out_width<<endl;
+//				cout<<"minibatch "<<minibatch<<endl;
+//				cout<<"out_channels "<<out_channels<<endl;
+//				cout<<"out_height "<<out_height<<endl;
+//				cout<<"out_width "<<out_width<<endl;
 
 				allocPout(n,c,h,w);
 				allocPinDiff();
@@ -546,7 +546,7 @@ class TrainingContext
   {
     m_batchSize = batch_size;
 		m_gpuid =gpuid;
-    printf ("gpuid %d batch_size %d\n", gpuid,batch_size);
+//    printf ("gpuid %d batch_size %d\n", gpuid,batch_size);
 		currentlayer=0;
 		alpha=alpha_;
 		beta=beta_;
@@ -626,7 +626,7 @@ class TrainingContext
  		  cout<<"finished at layer "<<currentlayer<<endl;
 			assert(0);
 		 } else {
-				cout<<"layer "<<currentlayer<<endl;
+				//cout<<"layer "<<currentlayer<<endl;
         checkCudaErrors(cudaSetDevice(m_gpuid));
 
         // Conv1 layer
@@ -641,7 +641,7 @@ class TrainingContext
  		  cout<<"finished at layer "<<currentlayer<<endl;
 			assert(0);
 		 } else {
-				cout<<"layer "<<currentlayer<<endl;
+				//cout<<"layer "<<currentlayer<<endl;
         checkCudaErrors(cudaSetDevice(m_gpuid));
 
         // Conv1 layer
@@ -779,7 +779,13 @@ void construct_Resnet(struct runingConfig * prc ){
 	vector < float *> * pd_dataV=prc->pd_dataV;
 	vector <TrainingContext * > * pcontextV = prc->pcontextV;
   for (int gpuid = 0; gpuid < num_gpus; gpuid++)
+//    	#pragma omp parallel
+//I can not use omp here because I need to insert them in order 
     {
+//        unsigned int cpu_thread_id = omp_get_thread_num();
+//				assert(cpu_thread_id < num_gpus);
+//				unsigned int gpuid = cpu_thread_id;
+//        cout<<"xx "<<gpuid<<endl;
       checkCudaErrors (cudaSetDevice (gpuid));
 			//alloc the input data
 			float * pdata;
@@ -1031,9 +1037,9 @@ void construct_Resnet(struct runingConfig * prc ){
 			pd_dataV->push_back(pdata);
 	}
 
-	for (int gpuid = 0; gpuid < num_gpus; gpuid++) {
-					(*pcontextV)[gpuid]-> print();
-	}
+//	for (int gpuid = 0; gpuid < num_gpus; gpuid++) {
+//					(*pcontextV)[gpuid]-> print();
+//	}
 }
 
 void syncAllGPU(int num_gpus) {
@@ -1102,6 +1108,8 @@ main (int argc, char **argv)
 	rc.pd_dataV = & d_dataV;
 	rc.pcontextV= & contextV;
 
+    	omp_set_num_threads(num_gpus);  // create as many CPU threads as there are CUDA devices
+        cout<<"num_gpus "<<num_gpus<<endl;
 	if(strcmp(nettype,"resnet")==0) {
 		cout<<"resnet"<<endl;
 		construct_Resnet(&rc);
@@ -1109,8 +1117,6 @@ main (int argc, char **argv)
 		cout<<"lenet"<<endl;
 		construct_Lenet(&rc);
 	}
-    	omp_set_num_threads(num_gpus);  // create as many CPU threads as there are CUDA devices
-        cout<<"num_gpus "<<num_gpus<<endl;
 
 	syncAllGPU(num_gpus);
   // Use SGD to train the network
@@ -1131,8 +1137,10 @@ main (int argc, char **argv)
         unsigned int cpu_thread_id = omp_get_thread_num();
 				assert(cpu_thread_id < num_gpus);
 				unsigned int gpuid = cpu_thread_id;
-                //cout<<"gpu id "<<gpuid<<endl;
-
+//                if(gpuid==3) {
+//                cout<<"gpu id "<<gpuid<<endl;
+//                cout<<"ctx id "<<contextV[gpuid]->m_gpuid<<endl<<flush;
+//                }
 				assert(contextV[gpuid]->m_gpuid == gpuid);
 			  checkCudaErrors (cudaSetDevice (gpuid));
 			  contextV[gpuid]->ForwardPropagation1 ();
@@ -1167,7 +1175,7 @@ main (int argc, char **argv)
 								totalsize = totalsize+tobetransfered;
 						  checkCudaErrors (cudaMemcpyAsync (pcurrent->pin + sz / (2 * sizeof (float)), pPrev->pin, tobetransfered, cudaMemcpyDefault));
 						} else {
-							cout <<"No need to sync : gpuid "<<gpuid << "layer "<<pcurrent->name<<endl;
+							//cout <<"No need to sync : gpuid "<<gpuid << "layer "<<pcurrent->name<<endl;
 						}
 			  }
 		
@@ -1218,7 +1226,7 @@ main (int argc, char **argv)
 								totalsize = totalsize+tobetransfered;
 						  checkCudaErrors (cudaMemcpyAsync (pcurrent->poutDiff + sz / (2 * sizeof (float)), pPrev->poutDiff, tobetransfered, cudaMemcpyDefault));
 						} else {
-							cout <<"No need to sync : gpuid "<<gpuid << "layer "<<pcurrent->name<<endl;
+							//cout <<"No need to sync : gpuid "<<gpuid << "layer "<<pcurrent->name<<endl;
 						}
 			  }
 		
