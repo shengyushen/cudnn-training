@@ -10,6 +10,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <omp.h>
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
@@ -1122,8 +1123,14 @@ main (int argc, char **argv)
 		//forward propage
 		while(true) {
 			//run one layer
-		  for (int gpuid = 0; gpuid < num_gpus; gpuid++)
+    	omp_set_num_threads(num_gpus);  // create as many CPU threads as there are CUDA devices
+		  //for (int gpuid = 0; gpuid < num_gpus; gpuid++)
+    	#pragma omp parallel
 			{
+        unsigned int cpu_thread_id = omp_get_thread_num();
+				assert(cpu_thread_id < num_gpus);
+				unsigned int gpuid = cpu_thread_id;
+
 				assert(contextV[gpuid]->m_gpuid == gpuid);
 			  checkCudaErrors (cudaSetDevice (gpuid));
 			  contextV[gpuid]->ForwardPropagation1 ();
@@ -1135,8 +1142,13 @@ main (int argc, char **argv)
 
 		  if (copy)
 			{
-			  for (int gpuid = 0; gpuid < num_gpus; gpuid++)
+			  //for (int gpuid = 0; gpuid < num_gpus; gpuid++)
+    		#pragma omp parallel
 			  {
+		        unsigned int cpu_thread_id = omp_get_thread_num();
+						assert(cpu_thread_id < num_gpus);
+						unsigned int gpuid = cpu_thread_id;
+
 			      //sync n+1 to n
 			      checkCudaErrors (cudaSetDevice (gpuid));
 						baseModule * pcurrent =contextV[gpuid]->getCurrentLayer();
@@ -1163,8 +1175,13 @@ main (int argc, char **argv)
 		//backward propage
 		while(true) {
 			//run one layer
-		  for (int gpuid = 0; gpuid < num_gpus; gpuid++)
+		  //for (int gpuid = 0; gpuid < num_gpus; gpuid++)
+    	#pragma omp parallel
 			{
+        unsigned int cpu_thread_id = omp_get_thread_num();
+				assert(cpu_thread_id < num_gpus);
+				unsigned int gpuid = cpu_thread_id;
+
 				assert(contextV[gpuid]->m_gpuid == gpuid);
 			  checkCudaErrors (cudaSetDevice (gpuid));
 			  contextV[gpuid]->BackwardPropagation();
@@ -1176,8 +1193,13 @@ main (int argc, char **argv)
 
 		  if (copy)
 			{
-			  for (int gpuid = 0; gpuid < num_gpus; gpuid++)
+			  //for (int gpuid = 0; gpuid < num_gpus; gpuid++)
+    		#pragma omp parallel
 			  {
+		        unsigned int cpu_thread_id = omp_get_thread_num();
+						assert(cpu_thread_id < num_gpus);
+						unsigned int gpuid = cpu_thread_id;
+
 			      //sync n+1 to n
 			      checkCudaErrors (cudaSetDevice (gpuid));
 						baseModule * pcurrent =contextV[gpuid]->getCurrentLayer();

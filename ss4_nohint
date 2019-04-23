@@ -1,0 +1,28 @@
+Iteration time:  num_gpus 4 batch_size 16 width 56 fract 0 totalsize 0 advise 0 time 77.1605 ms
+Iteration time:  num_gpus 4 batch_size 16 width 56 fract 1 totalsize 6733824 advise 0 time 147.86 ms
+Iteration time:  num_gpus 4 batch_size 16 width 112 fract 0 totalsize 0 advise 0 time 89.0161 ms
+Iteration time:  num_gpus 4 batch_size 16 width 112 fract 1 totalsize 33882112 advise 0 time 215.334 ms
+Iteration time:  num_gpus 4 batch_size 16 width 224 fract 0 totalsize 0 advise 0 time 133.618 ms
+Iteration time:  num_gpus 4 batch_size 16 width 224 fract 1 totalsize 138395648 advise 0 time 304.505 ms
+Iteration time:  num_gpus 4 batch_size 16 width 448 fract 0 totalsize 0 advise 0 time 346.023 ms
+Iteration time:  num_gpus 4 batch_size 16 width 448 fract 1 totalsize 562511872 advise 0 time 756.563 ms
+
+
+Iteration time:  num_gpus 4 batch_size 32 width 56 fract 0 totalsize 0 advise 0 time 90.1954 ms
+Iteration time:  num_gpus 4 batch_size 32 width 56 fract 1 totalsize 13467648 advise 0 time 191.83 ms
+Iteration time:  num_gpus 4 batch_size 32 width 112 fract 0 totalsize 0 advise 0 time 112.684 ms
+Iteration time:  num_gpus 4 batch_size 32 width 112 fract 1 totalsize 67764224 advise 0 time 275.866 ms
+Iteration time:  num_gpus 4 batch_size 32 width 224 fract 0 totalsize 0 advise 0 time 193.682 ms
+Iteration time:  num_gpus 4 batch_size 32 width 224 fract 1 totalsize 276791296 advise 0 time 427.558 ms
+
+
+Iteration time:  num_gpus 4 batch_size 64 width 56 fract 0 totalsize 0 advise 0 time 103.534 ms
+Iteration time:  num_gpus 4 batch_size 64 width 56 fract 1 totalsize 26935296 advise 0 time 218.895 ms
+Iteration time:  num_gpus 4 batch_size 64 width 112 fract 0 totalsize 0 advise 0 time 146.727 ms
+Iteration time:  num_gpus 4 batch_size 64 width 112 fract 1 totalsize 135528448 advise 0 time 300.933 ms
+Iteration time:  num_gpus 4 batch_size 64 width 224 fract 0 totalsize 0 advise 0 time 300.57 ms
+
+
+Iteration time:  num_gpus 4 batch_size 128 width 56 fract 0 totalsize 0 advise 0 time 148.481 ms
+Iteration time:  num_gpus 4 batch_size 128 width 56 fract 1 totalsize 53870592 advise 0 time 300.267 ms
+Iteration time:  num_gpus 4 batch_size 128 width 112 fract 0 totalsize 0 advise 0 time 242.947 ms
