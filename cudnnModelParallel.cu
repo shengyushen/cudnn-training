@@ -1164,7 +1164,7 @@ main (int argc, char **argv)
 						baseModule * pcurrent =contextV[gpuid]->getCurrentLayer();
 			      size_t sz = sizeof (float) * (pcurrent->getInputFloatNumber() );
 						assert(sz>0);
-						cout<<"sz "<<sz<<endl;
+//						cout<<"sz "<<sz<<endl;
 
 			      if (gpuid > 0 && pcurrent-> bNeedSyncInTensor) {
 							baseModule * pPrev =contextV[gpuid-1]->getCurrentLayer();
@@ -1215,7 +1215,7 @@ main (int argc, char **argv)
 						baseModule * pcurrent =contextV[gpuid]->getCurrentLayer();
 			      size_t sz = sizeof (float) * (pcurrent->getOutputFloatNumber() );
 						assert(sz>0);
-						cout<<"sz "<<sz<<endl;
+//						cout<<"sz "<<sz<<endl;
 
 			      if (gpuid > 0 && pcurrent-> bNeedSyncInTensor) {
 							baseModule * pPrev =contextV[gpuid-1]->getCurrentLayer();
