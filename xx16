@@ -1,0 +1,216 @@
+argc 8
+width 56
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 16 width 56 fract 0 totalsize 0 advise 1 time 60.1342 ms
+argc 8
+width 56
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 16 width 56 fract 1 totalsize 6733824 advise 1 time 81.8857 ms
+argc 8
+width 112
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 16 width 112 fract 0 totalsize 0 advise 1 time 69.0005 ms
+argc 8
+width 112
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 16 width 112 fract 1 totalsize 33882112 advise 1 time 92.4612 ms
+argc 8
+width 224
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 16 width 224 fract 0 totalsize 0 advise 1 time 103.37 ms
+argc 8
+width 224
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 16 width 224 fract 1 totalsize 138395648 advise 1 time 131.555 ms
+argc 8
+width 448
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 16 width 448 fract 0 totalsize 0 advise 1 time 261.326 ms
+argc 8
+width 448
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 16 width 448 fract 1 totalsize 562511872 advise 1 time 313.043 ms
+argc 8
+width 56
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 32 width 56 fract 0 totalsize 0 advise 1 time 63.9446 ms
+argc 8
+width 56
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 32 width 56 fract 1 totalsize 13467648 advise 1 time 88.7279 ms
+argc 8
+width 112
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 32 width 112 fract 0 totalsize 0 advise 1 time 84.326 ms
+argc 8
+width 112
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 32 width 112 fract 1 totalsize 67764224 advise 1 time 107.821 ms
+argc 8
+width 224
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 32 width 224 fract 0 totalsize 0 advise 1 time 152.274 ms
+argc 8
+width 224
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 32 width 224 fract 1 totalsize 276791296 advise 1 time 182.704 ms
+argc 8
+width 448
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 32 width 448 fract 0 totalsize 0 advise 1 time 458.964 ms
+argc 8
+width 448
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 32 width 448 fract 1 totalsize 1125023744 advise 1 time 515.488 ms
+argc 8
+width 56
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 64 width 56 fract 0 totalsize 0 advise 1 time 78.1125 ms
+argc 8
+width 56
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 64 width 56 fract 1 totalsize 26935296 advise 1 time 106.486 ms
+argc 8
+width 112
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 64 width 112 fract 0 totalsize 0 advise 1 time 119.119 ms
+argc 8
+width 112
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 64 width 112 fract 1 totalsize 135528448 advise 1 time 149.143 ms
+argc 8
+width 224
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 64 width 224 fract 0 totalsize 0 advise 1 time 250.51 ms
+argc 8
+width 224
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 64 width 224 fract 1 totalsize 553582592 advise 1 time 287.856 ms
+argc 8
+width 56
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 128 width 56 fract 0 totalsize 0 advise 1 time 100.713 ms
+argc 8
+width 56
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 128 width 56 fract 1 totalsize 53870592 advise 1 time 124.336 ms
+argc 8
+width 112
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 128 width 112 fract 0 totalsize 0 advise 1 time 189.173 ms
+argc 8
+width 112
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 128 width 112 fract 1 totalsize 271056896 advise 1 time 219.702 ms
+argc 8
+width 224
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 128 width 224 fract 0 totalsize 0 advise 1 time 436.569 ms
+argc 8
+width 224
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 128 width 224 fract 1 totalsize 1107165184 advise 1 time 488.14 ms
+argc 8
+width 56
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 16 width 56 fract 0 totalsize 0 advise 0 time 57.3346 ms
+argc 8
+width 56
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 16 width 56 fract 1 totalsize 6733824 advise 0 time 140.387 ms
+argc 8
+width 112
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
