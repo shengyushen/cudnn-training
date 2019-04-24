@@ -1,0 +1,27 @@
+argc 8
+width 448
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 64 width 448 fract 0 totalsize 0 advise 1 time 799.88 ms
+argc 8
+width 448
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 64 width 448 fract 1 totalsize 2250047488 advise 1 time 872.746 ms
+argc 8
+width 448
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
+Iteration time:  num_gpus 16 batch_size 128 width 448 fract 0 totalsize 0 advise 1 time 33530.8 ms
+argc 8
+width 448
+num_gpus 16
+deviceId 0
+num_gpus 16
+resnet
