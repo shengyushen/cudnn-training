@@ -1,0 +1,14 @@
+bs 16 w 56 ratio 1.29863 bandwidth 0.185846 GB
+bs 16 w 112 ratio 1.8164 bandwidth 0.317504 GB
+bs 16 w 224 ratio 3.4068 bandwidth 0.316667 GB
+bs 16 w 448 ratio 5.59223 bandwidth 0.309637 GB
+bs 32 w 56 ratio 1.37752 bandwidth 0.28229 GB
+bs 32 w 112 ratio 2.40606 bandwidth 0.315809 GB
+bs 32 w 224 ratio 4.74871 bandwidth 0.312333 GB
+bs 32 w 448 ratio 6.07344 bandwidth 0.312941 GB
+bs 64 w 56 ratio 1.64514 bandwidth 0.285773 GB
+bs 64 w 112 ratio 3.24519 bandwidth 0.303627 GB
+bs 64 w 224 ratio 6.00301 bandwidth 0.314764 GB
+bs 128 w 56 ratio 2.18847 bandwidth 0.296303 GB
+bs 128 w 112 ratio 4.37151 bandwidth 0.30932 GB
+bs 128 w 224 ratio 7.46769 bandwidth 0.315429 GB
